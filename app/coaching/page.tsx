@@ -12,42 +12,55 @@ export default function CoachingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col">
-      {/* Header */}
-      <div className="border-b border-slate-700 p-6">
-        <h1 className="text-3xl font-bold text-white mb-2">Coaching Session</h1>
-        <p className="text-slate-400">Talk to your AI sales coach</p>
-        <a href="/" className="text-emerald-400 hover:text-emerald-300 text-sm mt-2 inline-block">
-          ← Back to Home
-        </a>
+      {/* Header - Compact on mobile */}
+      <div className="border-b border-slate-700 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Sales Coaching</h1>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">AI-Powered Feedback</p>
+          </div>
+          <a 
+            href="/" 
+            className="text-emerald-400 hover:text-emerald-300 text-xs sm:text-sm px-3 py-2 rounded-lg hover:bg-slate-700/50 transition-colors"
+          >
+            ← Home
+          </a>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex gap-8 p-8">
-        {/* Voice Chat Interface */}
-        <div className="flex-1 min-w-0">
+      {/* Main Content - Mobile-first layout */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-0 lg:gap-6 overflow-hidden">
+        {/* Voice Chat - Takes full width on mobile */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} />
         </div>
 
-        {/* Transcript Panel */}
-        <div className="w-80 bg-slate-800 rounded-lg border border-slate-700 p-6 flex flex-col">
-          <h3 className="text-xl font-bold text-white mb-4">Transcript</h3>
-          <div className="flex-1 overflow-y-auto space-y-4">
+        {/* Transcript Sidebar - Hidden on mobile, shown on desktop */}
+        <div className="hidden lg:flex w-96 flex-col bg-slate-800 border-l border-slate-700 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0">
+            <h3 className="text-lg font-bold text-white">Conversation</h3>
+            <p className="text-xs text-slate-400 mt-1">{transcript.length / 2} turns</p>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {transcript.length === 0 ? (
-              <p className="text-slate-500 text-sm">Conversation will appear here...</p>
+              <div className="h-full flex items-center justify-center">
+                <p className="text-slate-500 text-sm text-center">Start a conversation to see the transcript here</p>
+              </div>
             ) : (
               transcript.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`p-3 rounded-lg ${
+                  className={`p-3 rounded-lg text-sm ${
                     msg.role === 'user'
-                      ? 'bg-emerald-900 text-emerald-100'
-                      : 'bg-blue-900 text-blue-100'
+                      ? 'bg-emerald-900/50 text-emerald-100'
+                      : 'bg-blue-900/50 text-blue-100'
                   }`}
                 >
                   <p className="text-xs font-semibold mb-1">
                     {msg.role === 'user' ? '🎤 You' : '🤖 Coach'}
                   </p>
-                  <p className="text-sm break-words">{msg.content}</p>
+                  <p className="text-xs break-words">{msg.content}</p>
                 </div>
               ))
             )}
@@ -55,8 +68,8 @@ export default function CoachingPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-slate-700 p-6 text-center text-slate-500 text-sm">
+      {/* Footer - Compact */}
+      <div className="border-t border-slate-700 px-4 py-3 text-center text-slate-500 text-xs">
         © 2026 AWEVO Software Solutions
       </div>
     </div>
