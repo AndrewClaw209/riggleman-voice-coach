@@ -6,231 +6,248 @@ interface VoiceChatProps {
   onTranscriptUpdate: (message: { role: string; content: string }) => void;
 }
 
-// Type definitions for OpenAI Realtime API
-interface RealtimeMessage {
-  type: string;
-  [key: string]: any;
-}
+/**
+ * VoiceChat using OpenAI's Realtime API
+ * 
+ * Architecture:
+ * 1. Backend creates ephemeral session → returns token
+ * 2. Browser connects WebSocket with token embedded in URL
+ * 3. Real-time bidirectional audio streaming (PCM16)
+ * 4. Responses stream back with audio + transcript
+ */
 
 export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'ready' | 'connecting' | 'connected' | 'listening' | 'responding'>('ready');
   const [error, setError] = useState<string | null>(null);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const realtimeTokenRef = useRef<string | null>(null);
-  const connectionAttemptRef = useRef(0);
 
-  // Initialize WebSocket connection to OpenAI Realtime API
+  const addLog = (msg: string) => {
+    console.log(msg);
+    setDebugLog((prev) => [...prev.slice(-4), msg]);
+  };
+
+  // Create session and connect to Realtime API
   const initializeRealtime = async () => {
     try {
       setConnectionStatus('connecting');
-      connectionAttemptRef.current += 1;
-      
-      // Get ephemeral token from backend proxy
+      addLog('📡 Requesting ephemeral session...');
+
+      // Get token from backend
       const tokenResponse = await fetch('/api/realtime-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'create-session' }),
       });
 
-      if (!tokenResponse.ok) {
-        throw new Error('Failed to get realtime token');
-      }
-
       const responseData = await tokenResponse.json();
-      if (!tokenResponse.ok || !responseData.token) {
-        throw new Error(responseData.error || 'No token in response');
+      if (!tokenResponse.ok) {
+        throw new Error(responseData.error || 'Failed to create session');
       }
-      const { token } = responseData;
-      realtimeTokenRef.current = token;
-      console.log('✅ Got ephemeral token');
 
-      // WebSocket URL with model parameter and token in URL
-      // Using ephemeral token which is already authorized server-side
-      const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-26&Authorization=${encodeURIComponent(`Bearer ${token}`})`;
-      
-      const ws = new WebSocket(wsUrl, 'realtime');
+      const { token } = responseData;
+      if (!token) throw new Error('No token received');
+
+      addLog(`✅ Got token: ${token.substring(0, 16)}...`);
+
+      // Connect to OpenAI Realtime API
+      // Documentation: https://platform.openai.com/docs/guides/realtime-webrtc
+      // The token is sent as Bearer in URL (ephemeral session format)
+      const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-26&authorization=${encodeURIComponent(`Bearer ${token}`)}`;
+
+      addLog('🔗 Opening WebSocket...');
+      const ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        console.log('✅ WebSocket opened');
+        addLog('✅ WebSocket connected!');
         setIsConnected(true);
         setConnectionStatus('connected');
-        connectionAttemptRef.current = 0;
       };
 
       ws.onmessage = (event) => {
         try {
-          const message: RealtimeMessage = JSON.parse(event.data);
-          
+          const message = JSON.parse(
+            typeof event.data === 'string'
+              ? event.data
+              : new TextDecoder().decode(event.data)
+          );
+
           switch (message.type) {
             case 'session.created':
-              console.log('📋 Session created');
-              break;
-
-            case 'session.updated':
-              console.log('📋 Session updated');
+              addLog('📋 Session created on OpenAI');
               break;
 
             case 'response.audio.delta':
+              // Received audio chunk - play it
               if (message.delta) {
                 playAudioChunk(message.delta);
               }
               break;
 
-            case 'response.text.delta':
-              if (message.delta) {
-                console.log('💬 Response:', message.delta);
+            case 'response.text.done':
+              // Full text response complete
+              if (message.text) {
+                addLog(`💬 Coach: ${message.text.substring(0, 50)}...`);
+                onTranscriptUpdate({ role: 'assistant', content: message.text });
               }
-              break;
-
-            case 'response.audio_transcript.delta':
-              if (message.delta) {
-                console.log('💬 Assistant:', message.delta);
-              }
+              setConnectionStatus('connected');
               break;
 
             case 'conversation.item.input_audio_transcription.completed':
+              // User speech transcribed
               if (message.transcript) {
-                console.log('🎤 You:', message.transcript);
+                addLog(`🎤 You: ${message.transcript.substring(0, 50)}...`);
                 onTranscriptUpdate({ role: 'user', content: message.transcript });
               }
               break;
 
-            case 'response.done':
-              setConnectionStatus('connected');
-              break;
-
             case 'error':
-              console.error('🚨 API Error:', message.error);
-              const errorMsg = message.error?.message || 'API error';
-              setError(`Error: ${errorMsg}`);
+              const errorMsg = message.error?.message || JSON.stringify(message.error);
+              addLog(`🚨 API Error: ${errorMsg}`);
+              setError(`API Error: ${errorMsg}`);
               break;
 
             default:
-              console.log('📨', message.type);
+              // Ignore other message types (response.done, session.updated, etc.)
+              if (message.type !== 'response.done' && message.type !== 'session.updated') {
+                addLog(`📨 ${message.type}`);
+              }
           }
         } catch (err) {
-          console.error('Parse error:', err);
+          addLog(`⚠️ Parse error: ${err}`);
         }
       };
 
       ws.onerror = (event) => {
-        console.error('🚨 WebSocket error:', event);
-        const errorMessage = `Connection error (attempt ${connectionAttemptRef.current})`;
-        setError(errorMessage);
+        addLog(`❌ WebSocket error`);
+        setError('Connection error - check browser console');
       };
 
       ws.onclose = (event) => {
-        console.log('❌ WebSocket closed:', event.code, event.reason);
+        addLog(`❌ WebSocket closed: ${event.code}`);
         setIsConnected(false);
         setConnectionStatus('ready');
-        
-        if (event.code !== 1000 && connectionAttemptRef.current < 3) {
-          // Auto-retry on unexpected closure
-          setTimeout(() => initializeRealtime(), 2000);
-        }
       };
 
       wsRef.current = ws;
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Initialization failed';
-      console.error('🚨 Init error:', errorMsg);
-      setError(errorMsg);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      addLog(`🚨 Init failed: ${msg}`);
+      setError(msg);
       setConnectionStatus('ready');
     }
   };
 
-  // Start recording and streaming audio
+  // Start recording and streaming audio to OpenAI
   const startRecording = async () => {
     try {
       setError(null);
 
       if (!isConnected) {
+        addLog('⏳ Connecting first...');
         await initializeRealtime();
-        setTimeout(() => startRecording(), 800);
+        setTimeout(() => startRecording(), 1000);
         return;
       }
 
+      addLog('🎤 Requesting microphone...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 16000,
+          sampleRate: { ideal: 24000 },
         },
       });
 
       streamRef.current = stream;
 
+      // Create audio context with 24kHz sample rate (Realtime API standard)
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 24000,
       });
       audioContextRef.current = audioContext;
 
       const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      // Create processor for real-time audio capture
+      const processor = audioContext.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
 
+      addLog('🎤 Recording started');
+      setIsRecording(true);
+      setConnectionStatus('listening');
+
       processor.onaudioprocess = (event) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN && isRecording) {
+        if (
+          wsRef.current?.readyState === WebSocket.OPEN &&
+          isRecording
+        ) {
+          // Convert float32 to PCM16
           const pcmData = float32ToPCM16(event.inputBuffer.getChannelData(0));
-          const audioBase64 = arrayBufferToBase64(pcmData);
-          
-          wsRef.current.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: audioBase64,
-          }));
+          const base64 = arrayBufferToBase64(pcmData);
+
+          // Send audio to Realtime API
+          wsRef.current.send(
+            JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: base64,
+            })
+          );
         }
       };
 
       source.connect(processor);
       processor.connect(audioContext.destination);
-
-      setIsRecording(true);
-      setConnectionStatus('listening');
-      console.log('🎤 Recording started');
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Microphone failed';
-      console.error('🚨 Recording error:', errorMsg);
-      setError(errorMsg);
+      const msg = err instanceof Error ? err.message : 'Microphone failed';
+      addLog(`🚨 Recording error: ${msg}`);
+      setError(msg);
     }
   };
 
-  // Stop recording
+  // Stop recording and commit audio buffer
   const stopRecording = () => {
+    addLog('⏹️ Stopping recording...');
+    
     streamRef.current?.getTracks().forEach((track) => track.stop());
     processorRef.current?.disconnect();
-    
-    if (audioContextRef.current?.state !== 'closed') {
-      audioContextRef.current?.close();
-    }
+    audioContextRef.current?.close();
 
     setIsRecording(false);
-    
+    setConnectionStatus('responding');
+
+    // Commit the audio buffer to trigger response
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'input_audio_buffer.commit',
-      }));
-      setConnectionStatus('responding');
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'input_audio_buffer.commit',
+        })
+      );
+      addLog('✅ Audio committed, waiting for response...');
     }
   };
 
-  // Audio conversion helpers
+  // Convert Float32 to PCM16 (16-bit signed integers)
   const float32ToPCM16 = (float32: Float32Array): Int16Array => {
     const pcm = new Int16Array(float32.length);
     for (let i = 0; i < float32.length; i++) {
+      // Clamp to [-1, 1]
       const s = Math.max(-1, Math.min(1, float32[i]));
+      // Convert to 16-bit integer
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     return pcm;
   };
 
+  // Encode ArrayBuffer to base64
   const arrayBufferToBase64 = (buffer: ArrayBuffer | Int16Array): string => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -240,6 +257,7 @@ export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps
     return btoa(binary);
   };
 
+  // Play audio chunk from API response
   const playAudioChunk = (base64Audio: string) => {
     try {
       const binary = atob(base64Audio);
@@ -248,21 +266,24 @@ export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps
         bytes[i] = binary.charCodeAt(i);
       }
 
-      const ctx = audioContextRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = audioContextRef.current;
+      if (!ctx) return;
+
+      // Decode PCM16 (24kHz from Realtime API)
       const pcm16 = new Int16Array(bytes.buffer);
-      const audio = ctx.createBuffer(1, pcm16.length, 24000);
-      const channel = audio.getChannelData(0);
+      const audioBuffer = ctx.createBuffer(1, pcm16.length, 24000);
+      const channel = audioBuffer.getChannelData(0);
 
       for (let i = 0; i < pcm16.length; i++) {
         channel[i] = pcm16[i] / 32768;
       }
 
       const source = ctx.createBufferSource();
-      source.buffer = audio;
+      source.buffer = audioBuffer;
       source.connect(ctx.destination);
       source.start(0);
     } catch (err) {
-      console.warn('⚠️ Playback error:', err);
+      addLog(`⚠️ Playback error: ${err}`);
     }
   };
 
@@ -276,14 +297,21 @@ export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 bg-gradient-to-br from-slate-900 to-slate-800">
+      {/* Status Indicator */}
       <div className="mb-8 text-center">
-        <div className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
-          connectionStatus === 'ready' ? 'bg-slate-700 text-slate-300' :
-          connectionStatus === 'connecting' ? 'bg-yellow-700 text-yellow-300' :
-          connectionStatus === 'listening' ? 'bg-blue-700 text-blue-300' :
-          connectionStatus === 'responding' ? 'bg-purple-700 text-purple-300' :
-          'bg-emerald-700 text-emerald-300'
-        }`}>
+        <div
+          className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+            connectionStatus === 'ready'
+              ? 'bg-slate-700 text-slate-300'
+              : connectionStatus === 'connecting'
+              ? 'bg-yellow-700 text-yellow-300'
+              : connectionStatus === 'listening'
+              ? 'bg-blue-700 text-blue-300'
+              : connectionStatus === 'responding'
+              ? 'bg-purple-700 text-purple-300'
+              : 'bg-emerald-700 text-emerald-300'
+          }`}
+        >
           {connectionStatus === 'ready' && '📡 Ready'}
           {connectionStatus === 'connecting' && '🔗 Connecting...'}
           {connectionStatus === 'listening' && '🎤 Listening...'}
@@ -292,6 +320,7 @@ export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps
         </div>
       </div>
 
+      {/* Main Button */}
       <div className="mb-8">
         {!isRecording ? (
           <button
@@ -307,16 +336,17 @@ export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps
             className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-bold text-lg rounded-full shadow-lg hover:shadow-xl transition-all flex items-center gap-3 animate-pulse"
           >
             <span className="text-2xl">⏹️</span>
-            Stop Recording
+            Stop & Submit
           </button>
         )}
       </div>
 
+      {/* Error Display */}
       {error && (
         <div className="mt-8 p-4 bg-red-900 border border-red-700 rounded-lg text-red-300 max-w-md">
           <p className="font-semibold">⚠️ Error</p>
           <p className="text-sm mt-2">{error}</p>
-          <button 
+          <button
             onClick={() => {
               setError(null);
               setIsConnected(false);
@@ -330,9 +360,25 @@ export default function VoiceChatRealtime({ onTranscriptUpdate }: VoiceChatProps
         </div>
       )}
 
+      {/* Debug Log */}
+      {debugLog.length > 0 && (
+        <div className="mt-8 p-4 bg-slate-700 rounded-lg text-slate-300 max-w-md text-xs font-mono space-y-1 max-h-32 overflow-y-auto">
+          {debugLog.map((log, i) => (
+            <div key={i}>{log}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Instructions */}
       <div className="mt-12 text-center text-slate-400 max-w-md">
-        <p className="text-sm">Click to start your real-time coaching session.</p>
-        <p className="text-xs mt-2 text-slate-500">Powered by OpenAI Realtime API</p>
+        <p className="text-sm">
+          {isConnected
+            ? 'Click "Start Coaching" to begin your real-time session'
+            : 'Click "Connect & Start" to initialize Realtime API'}
+        </p>
+        <p className="text-xs mt-2 text-slate-500">
+          Sub-second latency • Full-duplex audio streaming
+        </p>
       </div>
     </div>
   );
