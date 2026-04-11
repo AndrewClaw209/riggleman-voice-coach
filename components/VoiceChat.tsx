@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 
 interface VoiceChatProps {
   onTranscriptUpdate: (message: { role: string; content: string }) => void;
@@ -9,50 +9,51 @@ interface VoiceChatProps {
 export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('ready');
   const [error, setError] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const conversationRef = useRef<Array<{ role: string; content: string }>>([]);
-
-  // Initialize connection status
-  useEffect(() => {
-    setConnectionStatus('ready');
-  }, []);
 
   const startRecording = async () => {
     try {
       setError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm',
+      });
 
-      // Create media recorder
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await sendAudioToCoach(audioBlob);
-
-        // Stop stream
+        
+        // Stop the stream tracks
         stream.getTracks().forEach((track) => track.stop());
+
+        // Process the audio
+        await processAudio(audioBlob);
       };
 
       mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not access microphone'
-      );
+      const errorMsg = err instanceof Error ? err.message : 'Microphone access failed';
+      setError(errorMsg);
     }
   };
 
@@ -60,169 +61,123 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsProcessing(true);
     }
   };
 
-  const sendAudioToCoach = async (audioBlob: Blob) => {
-    setIsProcessing(true);
+  const processAudio = async (audioBlob: Blob) => {
     try {
-      // Convert audio to base64
+      setIsProcessing(true);
+
+      // Convert blob to base64
       const reader = new FileReader();
-      reader.onloadend = async () => {
+      reader.onload = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
 
-        // Send to API for processing
         const response = await fetch('/api/simple-coach', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             audio: base64Audio,
-            conversation: conversationRef.current,
+            conversation,
           }),
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('API Error:', errorData);
-          throw new Error(errorData.error || 'Failed to get response from coach');
+          throw new Error(errorData.error || 'Failed to get coaching response');
         }
 
-        const result = await response.json();
-        console.log('API Response received:', {
-          hasUserText: !!result.userText,
-          hasResponse: !!result.response,
-          hasAudioUrl: !!result.audioUrl,
-          audioUrlLength: result.audioUrl?.length || 0,
-        });
+        const { userText, response: coachResponse, audioUrl } = await response.json();
 
-        // Add user message to transcript
-        if (result.userText) {
-          onTranscriptUpdate({ role: 'user', content: result.userText });
-          conversationRef.current.push({
-            role: 'user',
-            content: result.userText,
-          });
-        }
+        // Add to conversation
+        setConversation((prev) => [
+          ...prev,
+          { role: 'user', content: userText },
+          { role: 'assistant', content: coachResponse },
+        ]);
 
-        // Add coach response
-        if (result.response) {
-          onTranscriptUpdate({ role: 'assistant', content: result.response });
-          conversationRef.current.push({
-            role: 'assistant',
-            content: result.response,
-          });
+        // Update parent transcript
+        onTranscriptUpdate({ role: 'user', content: userText });
+        onTranscriptUpdate({ role: 'assistant', content: coachResponse });
 
-          // Play response audio if available
-          if (result.audioUrl) {
-            console.log('Audio URL received, playing after delay...');
-            setTimeout(() => {
-              console.log('Attempting to play audio...');
-              playAudio(result.audioUrl);
-            }, 500); // Slightly longer delay
-          } else {
-            console.warn('No audioUrl in response');
+        // Play audio response
+        if (audioUrl) {
+          const audio = new Audio(audioUrl);
+          try {
+            await audio.play();
+          } catch (playErr) {
+            console.warn('⚠️ Audio playback warning:', playErr);
           }
         }
+
+        setIsProcessing(false);
       };
       reader.readAsDataURL(audioBlob);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process audio');
-    } finally {
+      const errorMsg = err instanceof Error ? err.message : 'Processing failed';
+      setError(errorMsg);
       setIsProcessing(false);
     }
   };
 
-  const playAudio = (audioUrl: string) => {
-    try {
-      console.log('Playing audio from:', audioUrl.substring(0, 50) + '...');
-      const audio = new Audio(audioUrl);
-      audio.volume = 1.0;
-      
-      // Try to play
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('✅ Audio playing successfully');
-          })
-          .catch((err) => {
-            console.error('❌ Failed to play audio:', err);
-            setError(`Audio failed: ${err.message}`);
-          });
-      }
-    } catch (err) {
-      console.error('Error creating audio element:', err);
-      setError(`Audio error: ${err instanceof Error ? err.message : 'Unknown'}`);
-    }
-  };
-
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
+    <div className="flex flex-col items-center justify-center h-full p-8 bg-gradient-to-br from-slate-900 to-slate-800">
       {/* Status Indicator */}
-      <div className="mb-8">
-        <div
-          className={`w-4 h-4 rounded-full ${
-            connectionStatus === 'ready'
-              ? 'bg-emerald-500'
-              : 'bg-red-500'
-          }`}
-        />
-        <p className="text-sm text-slate-400 mt-2 capitalize">
-          {connectionStatus === 'ready' ? 'Ready' : 'Error'}
-        </p>
-      </div>
-
-      {/* Main Content */}
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold mb-2">Start Speaking</h2>
-        <p className="text-slate-400">
-          Click the microphone button below and share your sales challenges
-        </p>
+      <div className="mb-8 text-center">
+        <div className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
+          isRecording ? 'bg-red-700 text-red-300' :
+          isProcessing ? 'bg-yellow-700 text-yellow-300' :
+          'bg-emerald-700 text-emerald-300'
+        }`}>
+          {isRecording && '🎤 Recording...'}
+          {isProcessing && '💭 Processing...'}
+          {!isRecording && !isProcessing && '✅ Ready'}
+        </div>
       </div>
 
       {/* Microphone Button */}
-      <button
-        onClick={isRecording ? stopRecording : startRecording}
-        disabled={isProcessing || connectionStatus !== 'ready'}
-        className={`mb-8 p-6 rounded-full transition-all ${
-          isRecording
-            ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/50'
-            : 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/50'
-        } disabled:opacity-50 disabled:cursor-not-allowed`}
-      >
-        <svg
-          className="w-12 h-12 text-white"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-          <path d="M17 16.91c-1.48 1.46-3.51 2.36-5.77 2.36-2.26 0-4.29-.9-5.77-2.36l-1.1 1.1c1.86 1.86 4.41 3 7.07 3 2.66 0 5.21-1.14 7.07-3l-1.1-1.1z" />
-        </svg>
-      </button>
+      <div className="mb-8">
+        {!isRecording ? (
+          <button
+            onClick={startRecording}
+            disabled={isProcessing}
+            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+          >
+            <span className="text-2xl">🎤</span>
+            Start Coaching
+          </button>
+        ) : (
+          <button
+            onClick={stopRecording}
+            className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-bold text-lg rounded-full shadow-lg hover:shadow-xl transition-all flex items-center gap-3 animate-pulse"
+          >
+            <span className="text-2xl">⏹️</span>
+            Stop & Process
+          </button>
+        )}
+      </div>
 
-      {/* Status Text */}
-      <p className="text-lg font-semibold mb-2">
-        {isRecording
-          ? 'Listening...'
-          : isProcessing
-          ? 'Processing...'
-          : 'Ready to listen'}
-      </p>
-
-      {/* Error Message */}
+      {/* Error Display */}
       {error && (
-        <div className="mt-8 p-4 bg-red-900 border border-red-700 rounded-lg max-w-md">
-          <p className="text-red-100 text-sm">{error}</p>
+        <div className="mt-8 p-4 bg-red-900 border border-red-700 rounded-lg text-red-300 max-w-md">
+          <p className="font-semibold">⚠️ Error</p>
+          <p className="text-sm mt-2">{error}</p>
+          <button 
+            onClick={() => setError(null)}
+            className="mt-3 px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
       {/* Instructions */}
-      <div className="mt-12 max-w-md text-slate-400 text-sm text-center">
-        <p>
-          {connectionStatus === 'ready'
-            ? 'Your coach is ready. Click the microphone and speak naturally about your sales challenges, goals, or performance metrics.'
-            : 'Connecting to your coach...'}
-        </p>
+      <div className="mt-12 text-center text-slate-400 max-w-md">
+        <p className="text-sm">Click the button to start your coaching session.</p>
+        <p className="text-xs mt-2 text-slate-500">Whisper + GPT-4 + TTS pipeline (6-15s latency)</p>
       </div>
     </div>
   );
