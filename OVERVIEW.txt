@@ -1,0 +1,209 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║           RIGGLEMAN SALES COACH - PROJECT OVERVIEW                       ║
+║                   © 2026 AWEVO Software Solutions                        ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📍 PROJECT LOCATION: ~/Projects/riggleman-voice-coach
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 PROJECT DESCRIPTION
+
+An AI-powered voice coaching application for Hyundai and Kia sales
+professionals. Users have natural conversations with an AI coach who
+provides actionable advice on sales performance, call handling, objection
+management, and closing techniques.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🏗️ ARCHITECTURE
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (Next.js)                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Home Page (/)              Coaching Page (/coaching)                   │
+│  ├─ Hero Section            ├─ Voice Chat UI                           │
+│  ├─ Feature Grid            ├─ Microphone Button                       │
+│  ├─ CTA Button              ├─ Recording Status                        │
+│  └─ Footer                  ├─ Transcript Display                      │
+│                             └─ Session Controls                         │
+│                                                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                        BACKEND (Node.js APIs)                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  POST /api/simple-coach                                                │
+│  ├─ Receive: Base64 Audio + Conversation History                       │
+│  ├─ Process:                                                            │
+│  │   ├─ Transcribe (Whisper)                                           │
+│  │   ├─ Get Response (GPT-4 Turbo)                                     │
+│  │   └─ Generate Speech (OpenAI TTS)                                   │
+│  └─ Return: Transcript + Response + Audio                              │
+│                                                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                      EXTERNAL APIs (OpenAI)                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ✓ Whisper API (Speech-to-Text)                                        │
+│  ✓ GPT-4 Turbo (Text Generation)                                       │
+│  ✓ TTS API (Text-to-Speech)                                            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ KEY FEATURES
+
+Voice Chat
+  • Microphone input with Web Audio API
+  • Real-time recording
+  • Automatic transcription
+  • Natural conversation flow
+
+AI Coaching
+  • Hyundai/Kia sales specialist
+  • Asks about metrics (call volume, conversion, objections)
+  • Provides actionable advice
+  • Maintains conversation context
+
+Professional UI
+  • Dark theme (slate-900)
+  • Green accents (emerald-600)
+  • Responsive layout
+  • Real-time transcript display
+
+Production Ready
+  • Full TypeScript support
+  • Error handling
+  • Environmental configuration
+  • Vercel deployment ready
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛠️ TECH STACK
+
+Framework        Next.js 16
+UI Library       React 19.2
+Language         TypeScript 5
+Styling          Tailwind CSS 4
+AI/ML            OpenAI API (Whisper, GPT-4, TTS)
+Audio            Web Audio API, MediaRecorder
+Runtime          Node.js 22+
+Deployment       Vercel
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📂 PROJECT FILES
+
+Core Application
+  app/page.tsx                      Home page
+  app/coaching/page.tsx             Coaching session
+  app/api/simple-coach/route.ts     Main API
+  app/api/coach/route.ts            Alternative API
+  components/VoiceChat.tsx          Voice UI component
+  app/layout.tsx                    Root layout
+
+Configuration
+  .env.local                        Environment (add API key)
+  .env.local.example                Template
+  package.json                      Dependencies
+  tsconfig.json                     TypeScript config
+  next.config.ts                    Next.js config
+  vercel.json                       Vercel deployment
+
+Documentation
+  README.md                         Full user guide
+  SETUP.md                          Detailed setup
+  QUICK_START.md                    30-second start
+  BUILD_COMPLETE.md                 Build details
+  OVERVIEW.txt                      This file
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 QUICK START
+
+1. Configure API Key
+   Edit .env.local and add: OPENAI_API_KEY=sk-...
+
+2. Start Development Server
+   npm run dev
+
+3. Open Browser
+   http://localhost:3000
+
+4. Test the App
+   • Click "Start Coaching Session"
+   • Click microphone and speak
+   • Listen to coach response
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 COST ESTIMATION
+
+Per Coaching Session (5-10 minutes):
+  Whisper API       ~$0.01-0.02
+  GPT-4 Turbo       ~$0.02-0.04
+  TTS API           ~$0.01-0.02
+  ─────────────────────────────
+  Total             ~$0.04-0.08
+
+Set usage alerts on OpenAI dashboard to monitor costs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 BUILD STATUS
+
+✓ Project initialized
+✓ Dependencies installed
+✓ Pages created (home, coaching)
+✓ Components built (VoiceChat)
+✓ API routes configured
+✓ TypeScript compilation successful
+✓ Production build successful
+✓ Vercel config ready
+✓ Documentation complete
+
+Status: READY FOR DEVELOPMENT & DEPLOYMENT
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 NEXT STEPS
+
+Immediate (Now)
+  [ ] Read QUICK_START.md
+  [ ] Configure .env.local with API key
+  [ ] Run: npm run dev
+  [ ] Test the application
+
+Short-term (Today)
+  [ ] Verify all features work
+  [ ] Test with real sales scenarios
+  [ ] Customize prompts if needed
+  [ ] Review transcript display
+
+Deployment (This Week)
+  [ ] Push to GitHub
+  [ ] Deploy to Vercel
+  [ ] Set up OpenAI cost alerts
+  [ ] Share with team members
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION
+
+See the following files for detailed information:
+
+• QUICK_START.md      → Get running in 30 seconds
+• README.md           → Complete user guide
+• SETUP.md            → Detailed setup instructions
+• BUILD_COMPLETE.md   → Build details and architecture
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Built with ❤️ for sales professionals at AWEVO Software Solutions
+© 2026 AWEVO Software Solutions
+
+All rights reserved.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
