@@ -2,8 +2,13 @@
 
 import { useState, useRef } from 'react';
 
+type ConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 interface VoiceChatProps {
-  onTranscriptUpdate: (message: { role: string; content: string }) => void;
+  onTranscriptUpdate: (message: ConversationMessage) => void;
 }
 
 type ProcessingStage = 'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
