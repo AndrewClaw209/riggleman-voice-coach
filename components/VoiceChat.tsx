@@ -93,7 +93,10 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
           throw new Error(errorData.error || 'Failed to get coaching response');
         }
 
-        const { userText, response: coachResponse, audioUrl } = await response.json();
+        const data = await response.json();
+        console.log('[VoiceChat] API response data:', data);
+        const { userText, response: coachResponse, audioUrl } = data;
+        console.log('[VoiceChat] Extracted values - userText:', !!userText, 'coachResponse:', !!coachResponse, 'audioUrl:', !!audioUrl, 'audioUrlLength:', audioUrl?.length);
 
         setConversation((prev) => [
           ...prev,
