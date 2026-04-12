@@ -106,16 +106,63 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         onTranscriptUpdate({ role: 'assistant', content: coachResponse });
 
         if (audioUrl) {
+          console.log('[VoiceChat] Starting audio playback...');
           setProcessingStage('speaking');
-          const audio = new Audio(audioUrl);
+          
           try {
-            await new Promise<void>((resolve) => {
-              audio.onended = () => resolve();
-              audio.play().catch(() => resolve());
+            const audio = new Audio();
+            audio.src = audioUrl;
+            
+            // Add error event listener
+            audio.addEventListener('error', (e) => {
+              console.error('[VoiceChat] Audio error event:', e, 'Audio state:', audio.error);
             });
-          } catch (playErr) {
-            console.warn('⚠️ Audio playback warning:', playErr);
+            
+            audio.addEventListener('play', () => {
+              console.log('[VoiceChat] Audio playback started');
+            });
+            
+            audio.addEventListener('ended', () => {
+              console.log('[VoiceChat] Audio playback ended');
+            });
+            
+            // Play and wait for completion
+            await new Promise<void>((resolve) => {
+              let resolved = false;
+              
+              const cleanup = () => {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeout);
+                  audio.removeEventListener('ended', onEnded);
+                  resolve();
+                }
+              };
+              
+              const onEnded = () => cleanup();
+              audio.addEventListener('ended', onEnded);
+              
+              // Fallback timeout (30 seconds max)
+              const timeout = setTimeout(() => {
+                console.warn('[VoiceChat] Audio timeout (30s), moving on');
+                cleanup();
+              }, 30000);
+              
+              const playPromise = audio.play();
+              if (playPromise !== undefined) {
+                playPromise
+                  .then(() => console.log('[VoiceChat] Audio play() succeeded'))
+                  .catch((err) => {
+                    console.error('[VoiceChat] Audio play() failed:', err);
+                    cleanup();
+                  });
+              }
+            });
+          } catch (err) {
+            console.error('[VoiceChat] Audio playback exception:', err);
           }
+        } else {
+          console.warn('[VoiceChat] No audioUrl returned from API');
         }
 
         setProcessingStage('idle');
