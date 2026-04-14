@@ -8,6 +8,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Store latest audio in memory for retrieval
+let latestAudio: Buffer | null = null;
+
 const SYSTEM_PROMPT = `You are a sales coaching expert specializing in Hyundai and Kia vehicle sales. Your role is to help sales professionals improve their performance.
 
 Key responsibilities:
@@ -83,15 +86,15 @@ export async function POST(request: NextRequest) {
         input: coachResponse,
       });
 
-      // Convert speech to base64 for client
+      // Store audio buffer in memory for /api/simple-coach/audio endpoint
       const speechBuffer = await speechResponse.arrayBuffer();
-      const speechBase64 = Buffer.from(speechBuffer).toString('base64');
-      const audioUrl = `data:audio/mp3;base64,${speechBase64}`;
+      latestAudio = Buffer.from(speechBuffer);
 
+      // Return JSON response with pointer to audio endpoint
       return NextResponse.json({
         userText,
         response: coachResponse,
-        audioUrl,
+        audioUrl: '/api/simple-coach/audio',
       });
     } finally {
       // Clean up temp file
@@ -109,4 +112,19 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Audio retrieval endpoint
+export async function GET(request: NextRequest) {
+  if (!latestAudio) {
+    return new NextResponse('No audio available', { status: 404 });
+  }
+
+  return new NextResponse(new Uint8Array(latestAudio), {
+    headers: {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': latestAudio.length.toString(),
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    },
+  });
 }
