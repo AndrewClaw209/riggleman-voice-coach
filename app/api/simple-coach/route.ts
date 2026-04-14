@@ -4,9 +4,11 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
 // Store latest audio in memory for retrieval
 let latestAudio: Buffer | null = null;
@@ -26,6 +28,7 @@ Be encouraging, direct, and always focus on practical, implementable advice that
 
 export async function POST(request: NextRequest) {
   try {
+    const openai = getOpenAIClient();
     const { audio, conversation } = await request.json();
 
     if (!audio) {
