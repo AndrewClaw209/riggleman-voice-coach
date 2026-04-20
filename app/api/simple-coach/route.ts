@@ -13,6 +13,11 @@ function getOpenAIClient() {
 // Store latest audio in memory for retrieval
 let latestAudio: Buffer | null = null;
 
+// Export getter for audio endpoint
+export function getLatestAudio() {
+  return latestAudio;
+}
+
 const SYSTEM_PROMPT = `You are a sales coaching expert specializing in Hyundai and Kia vehicle sales. Your role is to help sales professionals improve their performance.
 
 Key responsibilities:
@@ -117,17 +122,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Audio retrieval endpoint
-export async function GET(request: NextRequest) {
-  if (!latestAudio) {
-    return new NextResponse('No audio available', { status: 404 });
-  }
 
-  return new NextResponse(new Uint8Array(latestAudio), {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': latestAudio.length.toString(),
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-    },
-  });
-}
