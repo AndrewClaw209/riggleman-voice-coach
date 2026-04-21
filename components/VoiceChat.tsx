@@ -94,9 +94,17 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         }
 
         const data = await response.json();
-        console.log('[VoiceChat] API response data:', data);
-        const { userText, response: coachResponse, audioUrl } = data;
-        console.log('[VoiceChat] Extracted values - userText:', !!userText, 'coachResponse:', !!coachResponse, 'audioUrl:', !!audioUrl, 'audioUrlLength:', audioUrl?.length);
+        const {
+          userText,
+          response: coachResponse,
+          audio: audioBase64,
+          audioType,
+        } = data as {
+          userText: string;
+          response: string;
+          audio?: string;
+          audioType?: string;
+        };
 
         setConversation((prev) => [
           ...prev,
@@ -108,64 +116,40 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         onTranscriptUpdate({ role: 'user', content: userText });
         onTranscriptUpdate({ role: 'assistant', content: coachResponse });
 
-        if (audioUrl) {
-          console.log('[VoiceChat] Starting audio playback...');
+        if (audioBase64) {
           setProcessingStage('speaking');
-          
-          try {
-            const audio = new Audio();
-            audio.src = audioUrl;
-            
-            // Add error event listener
-            audio.addEventListener('error', (e) => {
-              console.error('[VoiceChat] Audio error event:', e, 'Audio state:', audio.error);
-            });
-            
-            audio.addEventListener('play', () => {
-              console.log('[VoiceChat] Audio playback started');
-            });
-            
-            audio.addEventListener('ended', () => {
-              console.log('[VoiceChat] Audio playback ended');
-            });
-            
-            // Play and wait for completion
-            await new Promise<void>((resolve) => {
-              let resolved = false;
-              
-              const cleanup = () => {
-                if (!resolved) {
-                  resolved = true;
-                  clearTimeout(timeout);
-                  audio.removeEventListener('ended', onEnded);
-                  resolve();
-                }
-              };
-              
-              const onEnded = () => cleanup();
-              audio.addEventListener('ended', onEnded);
-              
-              // Fallback timeout (30 seconds max)
-              const timeout = setTimeout(() => {
-                console.warn('[VoiceChat] Audio timeout (30s), moving on');
-                cleanup();
-              }, 30000);
-              
-              const playPromise = audio.play();
-              if (playPromise !== undefined) {
-                playPromise
-                  .then(() => console.log('[VoiceChat] Audio play() succeeded'))
-                  .catch((err) => {
-                    console.error('[VoiceChat] Audio play() failed:', err);
-                    cleanup();
-                  });
-              }
-            });
-          } catch (err) {
-            console.error('[VoiceChat] Audio playback exception:', err);
+
+          const binary = atob(audioBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
           }
-        } else {
-          console.warn('[VoiceChat] No audioUrl returned from API');
+          const audioBlob = new Blob([bytes], {
+            type: audioType ?? 'audio/mpeg',
+          });
+          const objectUrl = URL.createObjectURL(audioBlob);
+
+          try {
+            const audio = new Audio(objectUrl);
+            await new Promise<void>((resolve) => {
+              let settled = false;
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                resolve();
+              };
+              audio.addEventListener('ended', finish);
+              audio.addEventListener('error', finish);
+              const timeout = setTimeout(finish, 30000);
+              audio.play().catch((err) => {
+                console.error('[VoiceChat] Audio play() failed:', err);
+                finish();
+              });
+            });
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
         }
 
         setProcessingStage('idle');
