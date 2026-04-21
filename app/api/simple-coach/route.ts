@@ -27,6 +27,14 @@ type ConversationMessage = {
 
 export async function POST(request: NextRequest) {
   try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 500 }
+      );
+    }
+
     const openai = getOpenAIClient();
     const { audio, conversation } = (await request.json()) as {
       audio?: string;
@@ -67,18 +75,36 @@ export async function POST(request: NextRequest) {
     const coachResponse =
       completion.choices[0].message.content || 'I understand. Tell me more.';
 
-    const speechResponse = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: 'onyx',
-      input: coachResponse,
-    });
-    const speechBuffer = Buffer.from(await speechResponse.arrayBuffer());
+    const ttsResponse = await fetch(
+      'https://api.openai.com/v1/audio/speech',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: 'onyx',
+          input: coachResponse,
+          response_format: 'mp3',
+        }),
+      }
+    );
 
-    return NextResponse.json({
-      userText,
-      response: coachResponse,
-      audio: speechBuffer.toString('base64'),
-      audioType: 'audio/mpeg',
+    if (!ttsResponse.ok || !ttsResponse.body) {
+      const errorText = await ttsResponse.text().catch(() => '');
+      console.error('TTS request failed:', ttsResponse.status, errorText);
+      return NextResponse.json({ error: 'TTS request failed' }, { status: 502 });
+    }
+
+    return new Response(ttsResponse.body, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'no-store',
+        'X-User-Text': Buffer.from(userText, 'utf-8').toString('base64'),
+        'X-Coach-Response': Buffer.from(coachResponse, 'utf-8').toString('base64'),
+      },
     });
   } catch (error) {
     console.error('Error in coach API:', error);
