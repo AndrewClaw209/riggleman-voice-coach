@@ -26,20 +26,31 @@ export default function CoachingPage() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-900">
+    <div className="flex h-[100dvh] bg-slate-900">
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 flex flex-col p-4 sm:p-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Coaching Session</h1>
-          <p className="text-slate-400 mb-4 text-sm sm:text-base">Talk to your AI sales coach</p>
-          <Link href="/" className="text-emerald-400 hover:text-emerald-300 mb-6 text-sm sm:text-base">
-            ← Back to Home
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* Compact header */}
+        <header className="shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b border-slate-800 flex items-center gap-3">
+          <Link
+            href="/"
+            className="text-emerald-400 hover:text-emerald-300 text-sm shrink-0"
+            aria-label="Back to home"
+          >
+            ←
           </Link>
-          
-          {/* Voice Chat Component - Full Width on Mobile */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} />
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-semibold text-white leading-tight truncate">
+              Coaching Session
+            </h1>
+            <p className="text-slate-400 text-xs sm:text-sm leading-tight truncate">
+              Talk to your AI sales coach
+            </p>
           </div>
+        </header>
+
+        {/* Voice Chat Component */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} />
         </div>
       </div>
 

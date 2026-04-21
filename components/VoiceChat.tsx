@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -269,6 +269,13 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
 
   const isProcessing = processingStage !== 'idle' && processingStage !== 'error';
   const isRecording = processingStage === 'recording';
+  const hasConversation = conversation.length > 0;
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [conversation.length, processingStage]);
 
   // Stage info for display
   const stageInfo = {
@@ -283,121 +290,136 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   const stage = stageInfo[processingStage];
 
   return (
-    <div className="flex flex-col h-full w-full justify-between">
-      {/* Main Content - Centered */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        {/* Status Badge */}
-        <div className={`${stage.color} px-6 py-3 rounded-full text-white font-semibold mb-8 flex items-center gap-2 transition-all`}>
-          <span className="text-2xl">{stage.emoji}</span>
-          <span className="text-base">{stage.text}</span>
-        </div>
+    <div className="flex flex-col h-full w-full min-h-0">
+      {/* Scrollable content region */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div
+          className={`max-w-2xl mx-auto w-full flex flex-col items-center px-4 ${
+            hasConversation ? 'py-4' : 'py-8'
+          }`}
+        >
+          {/* Status badge (compact when a conversation is in progress) */}
+          <div
+            className={`${stage.color} rounded-full text-white font-semibold flex items-center gap-2 transition-all ${
+              hasConversation ? 'px-4 py-1.5 mb-4 text-sm' : 'px-6 py-3 mb-6 text-base'
+            }`}
+          >
+            <span className={hasConversation ? 'text-base' : 'text-2xl'}>
+              {stage.emoji}
+            </span>
+            <span>{stage.text}</span>
+          </div>
 
-        {/* Large Visual Progress Indicator */}
-        {isProcessing && (
-          <div className="mb-8 w-32 h-32 flex items-center justify-center">
-            <div className="relative w-full h-full">
-              {/* Animated circle background */}
-              <div className="absolute inset-0 rounded-full border-4 border-slate-700 animate-pulse" />
-              <div className="absolute inset-1 rounded-full border-4 border-transparent border-t-emerald-400 border-r-emerald-400 animate-spin" />
-              
-              {/* Center text */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-4xl mb-2">
+          {/* Large visual progress indicator — only before the first turn */}
+          {isProcessing && !hasConversation && (
+            <div className="mb-6 w-24 h-24 flex items-center justify-center">
+              <div className="relative w-full h-full">
+                <div className="absolute inset-0 rounded-full border-4 border-slate-700 animate-pulse" />
+                <div className="absolute inset-1 rounded-full border-4 border-transparent border-t-emerald-400 border-r-emerald-400 animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center text-3xl">
                   {processingStage === 'recording' && '🎙️'}
                   {processingStage === 'transcribing' && '📄'}
                   {processingStage === 'thinking' && '🧠'}
                   {processingStage === 'speaking' && '🔊'}
                 </div>
-                <div className="text-xs text-slate-400 text-center px-4">
-                  {processingStage === 'recording' && 'Listening...'}
-                  {processingStage === 'transcribing' && 'Converting...'}
-                  {processingStage === 'thinking' && 'Analyzing...'}
-                  {processingStage === 'speaking' && 'Playing...'}
-                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Last transcribed text preview - only show during processing */}
-        {lastUserText && isProcessing && (
-          <div className="mb-6 px-5 py-3 bg-slate-700/80 rounded-lg max-w-xs text-center">
-            <p className="text-xs text-slate-400 mb-1">You said:</p>
-            <p className="text-sm text-slate-200">{lastUserText}</p>
-          </div>
-        )}
+          {/* Last transcribed text preview during processing (pre-conversation) */}
+          {lastUserText && isProcessing && !hasConversation && (
+            <div className="mb-6 px-5 py-3 bg-slate-700/80 rounded-lg max-w-sm w-full text-center">
+              <p className="text-xs text-slate-400 mb-1">You said:</p>
+              <p className="text-sm text-slate-200">{lastUserText}</p>
+            </div>
+          )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 px-5 py-3 bg-red-900/80 rounded-lg max-w-xs text-center">
-            <p className="text-sm text-red-200 font-semibold">{error}</p>
-            <button
-              onClick={() => {
-                setError(null);
-                setProcessingStage('idle');
-              }}
-              className="mt-3 px-4 py-2 bg-red-700 hover:bg-red-600 text-white text-xs rounded-lg font-semibold transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* Instructions - Only show when idle */}
-        {processingStage === 'idle' && conversation.length === 0 && (
-          <div className="text-center mb-8 max-w-sm">
-            <p className="text-base text-slate-300 font-semibold mb-3">Ready to get coached?</p>
-            <p className="text-sm text-slate-400">Tap the button below and speak naturally. The AI will listen, understand, and give you instant feedback.</p>
-          </div>
-        )}
-
-        {/* Past messages - scrollable on mobile */}
-        {conversation.length > 0 && (
-          <div className="w-full flex-1 min-h-0 overflow-y-auto mb-6 space-y-2 px-2">
-            {conversation.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`p-3 rounded-lg text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-emerald-900/60 text-emerald-100 ml-6'
-                    : 'bg-blue-900/60 text-blue-100 mr-6'
-                }`}
+          {/* Error */}
+          {error && (
+            <div className="mb-6 px-5 py-3 bg-red-900/80 rounded-lg max-w-sm w-full text-center">
+              <p className="text-sm text-red-200 font-semibold">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setProcessingStage('idle');
+                }}
+                className="mt-3 px-4 py-2 bg-red-700 hover:bg-red-600 text-white text-xs rounded-lg font-semibold transition-colors"
               >
-                <p className="font-semibold text-xs mb-1">
-                  {msg.role === 'user' ? '🎤 You' : '🤖 Coach'}
-                </p>
-                <p className="text-xs sm:text-sm break-words whitespace-pre-wrap">{msg.content}</p>
-              </div>
-            ))}
-          </div>
-        )}
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Intro — only when idle and nothing has happened yet */}
+          {processingStage === 'idle' && !hasConversation && (
+            <div className="text-center mb-6 max-w-sm">
+              <p className="text-base text-slate-300 font-semibold mb-2">
+                Ready to get coached?
+              </p>
+              <p className="text-sm text-slate-400">
+                Tap the button below and speak naturally. The AI will listen,
+                understand, and give you instant feedback.
+              </p>
+            </div>
+          )}
+
+          {/* Conversation transcript */}
+          {hasConversation && (
+            <div className="w-full space-y-2">
+              {conversation.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-lg ${
+                    msg.role === 'user'
+                      ? 'bg-emerald-900/60 text-emerald-100 ml-6'
+                      : 'bg-blue-900/60 text-blue-100 mr-6'
+                  }`}
+                >
+                  <p className="font-semibold text-xs mb-1 opacity-80">
+                    {msg.role === 'user' ? '🎤 You' : '🤖 Coach'}
+                  </p>
+                  <p className="text-sm break-words whitespace-pre-wrap">
+                    {msg.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      {/* Bottom Button - Full Width, Large Touch Target */}
-      <div className="px-4 py-6 bg-gradient-to-t from-slate-900 to-transparent">
+      {/* Pinned action bar */}
+      <div
+        className="shrink-0 border-t border-slate-800 bg-slate-900/95 backdrop-blur px-4 pt-3"
+        style={{
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+        }}
+      >
         {!isRecording ? (
           <button
             onClick={startRecording}
             disabled={isProcessing}
-            className="w-full py-5 px-6 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-50 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+            className="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-50 text-white font-bold text-lg rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3"
           >
-            <span className="text-3xl">🎤</span>
-            <span>Start Coaching</span>
+            <span className="text-2xl">🎤</span>
+            <span>{hasConversation ? 'Continue Talking' : 'Start Coaching'}</span>
           </button>
         ) : (
           <button
             onClick={stopRecording}
-            className="w-full py-5 px-6 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 animate-pulse"
+            className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-lg rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 animate-pulse"
           >
-            <span className="text-3xl">⏹️</span>
-            <span>Stop & Process</span>
+            <span className="text-2xl">⏹️</span>
+            <span>Stop &amp; Process</span>
           </button>
         )}
-        
-        {/* Turn counter */}
-        {conversation.length > 0 && (
-          <p className="text-xs text-slate-500 text-center mt-3">
-            {conversation.length / 2} conversation turn{conversation.length / 2 !== 1 ? 's' : ''}
+
+        {hasConversation && (
+          <p className="text-xs text-slate-500 text-center mt-2">
+            {conversation.length / 2} turn
+            {conversation.length / 2 !== 1 ? 's' : ''}
           </p>
         )}
       </div>
