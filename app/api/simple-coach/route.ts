@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       model: 'gpt-4-turbo',
       messages: messages.slice(-20),
       temperature: 0.8,
-      max_tokens: 500,
+      max_tokens: 1500,
     });
 
     const coachResponse =

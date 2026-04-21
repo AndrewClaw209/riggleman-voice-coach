@@ -21,12 +21,28 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 44-byte zero-length WAV — used once, synchronously in a user-gesture
+  // handler, to unlock the Audio element on iOS Safari so later programmatic
+  // .play() calls succeed.
+  const SILENT_WAV =
+    'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+  const primeAudio = () => {
+    if (audioRef.current) return;
+    const audio = new Audio();
+    audio.src = SILENT_WAV;
+    audio.play().catch(() => {});
+    audioRef.current = audio;
+  };
 
   const startRecording = async () => {
     try {
       setError(null);
+      primeAudio();
       setProcessingStage('recording');
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -65,6 +81,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && processingStage === 'recording') {
+      primeAudio();
       mediaRecorderRef.current.stop();
       setProcessingStage('transcribing');
     }
@@ -128,20 +145,29 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
             type: audioType ?? 'audio/mpeg',
           });
           const objectUrl = URL.createObjectURL(audioBlob);
+          const audio = audioRef.current ?? new Audio();
+          audioRef.current = audio;
 
           try {
-            const audio = new Audio(objectUrl);
             await new Promise<void>((resolve) => {
               let settled = false;
               const finish = () => {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timeout);
+                audio.removeEventListener('ended', finish);
+                audio.removeEventListener('error', onError);
                 resolve();
               };
+              const onError = () => {
+                console.error('[VoiceChat] Audio error:', audio.error);
+                finish();
+              };
               audio.addEventListener('ended', finish);
-              audio.addEventListener('error', finish);
+              audio.addEventListener('error', onError);
               const timeout = setTimeout(finish, 30000);
+
+              audio.src = objectUrl;
               audio.play().catch((err) => {
                 console.error('[VoiceChat] Audio play() failed:', err);
                 finish();
