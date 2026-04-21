@@ -244,7 +244,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         {lastUserText && isProcessing && (
           <div className="mb-6 px-5 py-3 bg-slate-700/80 rounded-lg max-w-xs text-center">
             <p className="text-xs text-slate-400 mb-1">You said:</p>
-            <p className="text-sm text-slate-200">{lastUserText.substring(0, 150)}{lastUserText.length > 150 ? '...' : ''}</p>
+            <p className="text-sm text-slate-200">{lastUserText}</p>
           </div>
         )}
 
@@ -274,8 +274,8 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
 
         {/* Past messages - scrollable on mobile */}
         {conversation.length > 0 && (
-          <div className="w-full max-h-xs overflow-y-auto mb-6 space-y-2 px-2">
-            {conversation.slice(-4).map((msg, idx) => (
+          <div className="w-full flex-1 min-h-0 overflow-y-auto mb-6 space-y-2 px-2">
+            {conversation.map((msg, idx) => (
               <div
                 key={idx}
                 className={`p-3 rounded-lg text-sm ${
@@ -287,7 +287,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
                 <p className="font-semibold text-xs mb-1">
                   {msg.role === 'user' ? '🎤 You' : '🤖 Coach'}
                 </p>
-                <p className="text-xs sm:text-sm break-words">{msg.content.substring(0, 200)}</p>
+                <p className="text-xs sm:text-sm break-words whitespace-pre-wrap">{msg.content}</p>
               </div>
             ))}
           </div>

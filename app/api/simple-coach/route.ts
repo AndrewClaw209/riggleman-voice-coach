@@ -18,7 +18,7 @@ Key responsibilities:
 - Offer tips on building rapport with customers
 - Suggest ways to increase follow-ups and closing rates
 
-Be encouraging, direct, and always focus on practical, implementable advice that works in automotive sales.`;
+This is a voice conversation, so keep replies short and natural — usually 2 to 4 sentences. Only go longer when the user explicitly asks for detail or a walkthrough. Be encouraging, direct, and always focus on practical, implementable advice that works in automotive sales.`;
 
 type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -58,17 +58,17 @@ export async function POST(request: NextRequest) {
     ];
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o-mini',
       messages: messages.slice(-20),
       temperature: 0.8,
-      max_tokens: 1500,
+      max_tokens: 600,
     });
 
     const coachResponse =
       completion.choices[0].message.content || 'I understand. Tell me more.';
 
     const speechResponse = await openai.audio.speech.create({
-      model: 'tts-1-hd',
+      model: 'tts-1',
       voice: 'onyx',
       input: coachResponse,
     });
