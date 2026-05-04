@@ -1,12 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/AuthContext';
+import Link from 'next/link';
 
 export default function Home() {
   const router = useRouter();
+  const { user, userProfile, loading } = useAuth();
 
   const handleStartSession = () => {
-    router.push('/coaching');
+    if (user) {
+      router.push('/coaching');
+    } else {
+      router.push('/login');
+    }
   };
 
   return (
@@ -25,13 +32,41 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Main CTA Button */}
-        <button
-          onClick={handleStartSession}
-          className="w-full py-4 px-6 mb-8 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl"
-        >
-          Start Coaching Session
-        </button>
+        {/* Main CTA Buttons */}
+        {loading ? (
+          <div className="w-full py-4 px-6 mb-8 bg-slate-800 text-slate-400 text-lg font-semibold rounded-lg text-center">
+            Loading...
+          </div>
+        ) : user ? (
+          <div className="space-y-4 mb-8">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+              <p className="text-slate-300 text-sm mb-1">Welcome back,</p>
+              <p className="text-white font-semibold text-lg">{userProfile?.displayName}</p>
+              <p className="text-slate-400 text-sm">{userProfile?.dealership}</p>
+            </div>
+            <button
+              onClick={handleStartSession}
+              className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl"
+            >
+              Start Coaching Session
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-4 mb-8">
+            <Link
+              href="/login"
+              className="flex-1 py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl text-center"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/signup"
+              className="flex-1 py-4 px-6 bg-slate-700 hover:bg-slate-600 text-white text-lg font-semibold rounded-lg transition-colors duration-200 text-center"
+            >
+              Sign Up
+            </Link>
+          </div>
+        )}
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
