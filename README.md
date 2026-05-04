@@ -1,6 +1,6 @@
 # Riggleman Sales Coach
 
-An AI-powered voice coaching application for Hyundai and Kia sales professionals. Have natural conversations with your personal sales coach to improve call handling, objection management, and closing techniques.
+An AI-powered voice coaching application that brings Curtis Riggleman's "Dial For Dollars" methodology to life. Have natural conversations with Curtis himself (AI-powered) to master phone sales, appointment setting, and objection handling using his proven psychology-driven techniques.
 
 ## Features
 
@@ -99,11 +99,26 @@ npm run start
 - `POST /api/simple-coach` - Main coaching endpoint
   - Accepts audio (base64), returns transcription and coach response
 
-## System Prompt
+## Curtis Riggleman's Methodology
 
-The coach uses this personality:
+The coach embodies Curtis Riggleman's personality and teaches his core principles:
 
-> You are a sales coaching expert specializing in Hyundai and Kia vehicle sales. Your role is to help sales professionals improve their performance. Ask about their call volume, conversion rates, and common objections they face. Provide actionable, practical advice based on their responses.
+**Philosophy:**
+- The phone is for setting appointments, NOT selling cars
+- The 7-Second Rule: Hook them in 7 seconds or lose them
+- Information Control: Never negotiate over the phone
+- The Winning Scenario: Make them solve YOUR problem
+- Over-promise to win: Excitement drives action
+
+**Key Techniques:**
+- Pattern Interrupts
+- Fear of Loss ("Two appointments already scheduled...")
+- USST 1-Minute Callback
+- Service to Sales conversions
+- Referral generation tactics
+
+**Personality:**
+Direct, no-nonsense, psychology-focused, metric-driven, and zero tolerance for excuses. Curtis gives you exact scripts and challenges bad habits.
 
 ## Cost Considerations
 
