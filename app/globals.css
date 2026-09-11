@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0d12;
+  --foreground: #f7f2e5;
+  --curtis-bg: #0a0d12;
+  --curtis-panel: #151a22;
+  --curtis-panel-raised: #1c2430;
+  --curtis-gold: #f2cd7f;
+  --curtis-gold-strong: #e2a73f;
+  --curtis-cream: #f7f2e5;
+  --curtis-muted: #aaa59a;
 }
 
 @theme inline {
@@ -12,15 +19,59 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background:
+    radial-gradient(circle at 50% -12%, #202b3b 0%, var(--curtis-bg) 46%),
+    var(--curtis-bg);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Inter, Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* Curtis Riggleman brand layer. These aliases keep the existing component
+   structure intact while giving every route the shared black-and-gold system. */
+.bg-slate-900 { background-color: var(--curtis-bg) !important; }
+.bg-slate-800 { background-color: var(--curtis-panel) !important; }
+.bg-slate-700 { background-color: var(--curtis-panel-raised) !important; }
+.bg-slate-600 { background-color: #303846 !important; }
+.bg-slate-900\/95 { background-color: rgb(10 13 18 / 95%) !important; }
+.bg-slate-900\/40 { background-color: rgb(10 13 18 / 40%) !important; }
+.bg-slate-700\/70 { background-color: rgb(28 36 48 / 70%) !important; }
+.bg-slate-700\/80 { background-color: rgb(28 36 48 / 80%) !important; }
+
+.text-emerald-100,
+.text-emerald-200,
+.text-emerald-300,
+.text-emerald-400,
+.text-emerald-500,
+.text-emerald-600 { color: var(--curtis-gold) !important; }
+.text-slate-200 { color: #e8e2d5 !important; }
+.text-slate-300 { color: #d8d5ca !important; }
+.text-slate-400 { color: var(--curtis-muted) !important; }
+.text-slate-500 { color: #77756e !important; }
+.text-blue-100,
+.text-blue-300 { color: #ead9ae !important; }
+
+.border-slate-800 { border-color: rgb(242 205 127 / 18%) !important; }
+.border-slate-700 { border-color: rgb(242 205 127 / 24%) !important; }
+.border-slate-600 { border-color: rgb(242 205 127 / 38%) !important; }
+.border-emerald-700\/60 { border-color: rgb(226 167 63 / 60%) !important; }
+.border-t-emerald-400,
+.border-r-emerald-400 { border-color: var(--curtis-gold) !important; }
+.ring-emerald-500 { --tw-ring-color: var(--curtis-gold) !important; }
+
+.bg-emerald-600,
+.bg-emerald-700 { background-color: var(--curtis-gold-strong) !important; color: #17120a !important; }
+.hover\:bg-emerald-500:hover { background-color: var(--curtis-gold) !important; color: #17120a !important; }
+.hover\:bg-emerald-600:hover,
+.hover\:bg-emerald-700:hover { background-color: var(--curtis-gold) !important; color: #17120a !important; }
+.from-emerald-600 { --tw-gradient-from: var(--curtis-gold-strong) var(--tw-gradient-from-position) !important; }
+.to-emerald-700 { --tw-gradient-to: #b98125 var(--tw-gradient-to-position) !important; }
+.hover\:from-emerald-500:hover { --tw-gradient-from: var(--curtis-gold) var(--tw-gradient-from-position) !important; }
+.hover\:to-emerald-600:hover { --tw-gradient-to: var(--curtis-gold-strong) var(--tw-gradient-to-position) !important; }
+
+input:focus,
+select:focus,
+button:focus-visible,
+a:focus-visible { outline-color: var(--curtis-gold) !important; }
+
+::selection { background: var(--curtis-gold-strong); color: #17120a; }
