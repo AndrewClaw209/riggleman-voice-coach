@@ -391,7 +391,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
 
   // Stage info for display
   const stageInfo = {
-    connecting: { emoji: '🔗', text: 'Connecting live coach...', color: 'bg-blue-600' },
+    connecting: { emoji: '☎️', text: 'Connecting live coach...', color: 'bg-[#c58b2a] text-[#17120a]' },
     live: { emoji: '🟢', text: 'Live coaching', color: 'bg-emerald-600' },
     recording: { emoji: '🎤', text: 'Recording...', color: 'bg-red-600' },
     transcribing: { emoji: '📝', text: 'Transcribing...', color: 'bg-blue-600' },
