@@ -171,7 +171,13 @@ function CoachingPageContent() {
         const snapshot = await getDocs(query(collection(db, 'sessions'), where('userId', '==', user.uid)));
         const completed = snapshot.docs.map((item) => item.data())
           .filter((item) => item.status === 'completed' && item.scorecard && item.score && typeof item.score.total === 'number')
-          .map((item) => ({ score: item.score as Score, scenario: item.scenario as Scenario, endedAt: item.endedAt as string | undefined }));
+          .map((item) => ({
+            score: item.score as Score,
+            scenario: item.scenario as Scenario,
+            endedAt: item.endedAt as string | undefined,
+            scorecard: item.scorecard,
+            messages: item.messages || [],
+          }));
         const entry = buildLeaderboardEntry(user.uid, user.displayName || 'Sales Rep', completed);
         if (entry) await setDoc(doc(db, 'leaderboard', user.uid), entry);
       }

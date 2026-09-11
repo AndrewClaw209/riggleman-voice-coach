@@ -12,14 +12,29 @@ export type LeaderboardEntry = {
     score: Score;
     scenario: Scenario;
     endedAt: string;
+    summary: string;
+    strengths: string[];
+    improvements: string[];
+    messages: LeaderboardMessage[];
   };
   updatedAt: string;
+};
+
+export type LeaderboardMessage = {
+  role: 'user' | 'assistant';
+  content: string;
 };
 
 export type CompletedScore = {
   score: Score;
   scenario: Scenario;
   endedAt?: string;
+  scorecard?: {
+    summary?: string;
+    strengths?: string[];
+    improvements?: string[];
+  };
+  messages?: LeaderboardMessage[];
 };
 
 export function buildLeaderboardEntry(
@@ -46,6 +61,10 @@ export function buildLeaderboardEntry(
       score: best.score,
       scenario: best.scenario,
       endedAt: best.endedAt || now,
+      summary: best.scorecard?.summary || 'Review this call and keep building consistency.',
+      strengths: best.scorecard?.strengths || [],
+      improvements: best.scorecard?.improvements || [],
+      messages: best.messages || [],
     },
     updatedAt: now,
   };

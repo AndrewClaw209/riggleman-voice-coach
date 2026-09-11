@@ -43,8 +43,17 @@ function PublicScorecardModal({ entry, onClose }: { entry: LeaderboardEntry; onC
         <button onClick={onClose} aria-label="Close scorecard" className="rounded-full p-2 text-2xl leading-none text-slate-400 hover:bg-slate-700 hover:text-white">×</button>
       </div>
       <div className="mt-6 flex items-end gap-2"><span className="text-6xl font-black text-[#f2cd7f]">{score.total}</span><span className="mb-2 text-slate-400">/30</span></div>
-      <p className="mt-2 text-sm text-slate-400">Public score breakdown · transcripts and coaching notes stay private.</p>
+      <p className="mt-2 text-sm text-slate-400">Full scorecard and conversation · iron sharpens iron.</p>
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">{SCORE_DIMENSIONS.map((key) => <div key={key} className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4"><p className="text-xs text-slate-400">{dimensionLabels[key]}</p><p className="mt-2 text-2xl font-black text-white">{typeof score[key] === 'number' ? score[key] : '—'}<span className="text-sm font-normal text-slate-500">/5</span></p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-gradient-to-r from-[#c58b2a] to-[#f2cd7f]" style={{ width: `${Math.max(0, Math.min(5, score[key] || 0)) * 20}%` }} /></div></div>)}</div>
+      <p className="mt-6 leading-6 text-slate-200">{publicCard?.summary || 'Review this call and keep building consistency.'}</p>
+      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div><h3 className="font-semibold text-emerald-300">Strengths</h3><ul className="mt-2 space-y-1 text-sm text-emerald-100">{(publicCard?.strengths || []).map((item) => <li key={item}>• {item}</li>)}</ul></div>
+        <div><h3 className="font-semibold text-amber-300">Next focus</h3><ul className="mt-2 space-y-1 text-sm text-amber-100">{(publicCard?.improvements || []).map((item) => <li key={item}>• {item}</li>)}</ul></div>
+      </div>
+      <details className="mt-6 rounded-xl bg-slate-900/60 p-4" open>
+        <summary className="cursor-pointer font-semibold text-slate-200">View conversation</summary>
+        {publicCard?.messages?.length ? <div className="mt-4 space-y-3">{publicCard.messages.map((message, index) => <div key={`${message.content}-${index}`} className={`rounded-lg p-3 text-sm ${message.role === 'user' ? 'bg-emerald-900/50 text-emerald-100' : 'bg-slate-700 text-slate-200'}`}><p className="mb-1 text-xs font-semibold uppercase tracking-wider opacity-70">{message.role === 'user' ? entry.displayName : 'Customer'}</p>{message.content}</div>)}</div> : <p className="mt-3 text-sm text-slate-400">This scorecard was created before full public transcripts were enabled.</p>}
+      </details>
       <button onClick={onClose} className="mt-7 w-full rounded-xl bg-gradient-to-r from-[#f2cd7f] to-[#c58b2a] px-4 py-3 font-bold text-[#17120a]">Close scorecard</button>
     </div>
   </div>;
@@ -109,7 +118,13 @@ function LeaderboardContent() {
     const snapshot = await getDocs(query(collection(db, 'sessions'), where('userId', '==', user.uid)));
     const completed = snapshot.docs.map((item) => item.data())
       .filter((item) => item.status === 'completed' && item.scorecard && item.score && typeof item.score.total === 'number')
-      .map((item) => ({ score: item.score, scenario: item.scenario as Scenario, endedAt: item.endedAt as string | undefined }));
+      .map((item) => ({
+        score: item.score,
+        scenario: item.scenario as Scenario,
+        endedAt: item.endedAt as string | undefined,
+        scorecard: item.scorecard,
+        messages: item.messages || [],
+      }));
     const entry = buildLeaderboardEntry(user.uid, user.displayName || 'Sales Rep', completed);
     if (entry) await setDoc(doc(db, 'leaderboard', user.uid), entry);
   }, [user]);
@@ -160,7 +175,7 @@ function LeaderboardContent() {
         {entries.length > 50 ? <p className="px-5 pb-5 text-center text-xs text-slate-500">Showing the top 50 sales professionals.</p> : null}
       </section>
 
-      <section className="rounded-xl border border-slate-800/80 bg-slate-900/50 px-5 py-4 sm:px-6"><div className="flex gap-3"><span className="mt-0.5 text-[#f2cd7f]" aria-hidden="true">◆</span><div><h2 className="text-sm font-semibold text-slate-200">How the rankings work</h2><p className="mt-1 text-xs leading-5 text-slate-500">Every completed scorecard contributes automatically. Rankings use your best call, average score, and completed sessions. Your display name and aggregate stats are public; transcripts and coaching notes stay private.</p></div></div></section>
+      <section className="rounded-xl border border-slate-800/80 bg-slate-900/50 px-5 py-4 sm:px-6"><div className="flex gap-3"><span className="mt-0.5 text-[#f2cd7f]" aria-hidden="true">◆</span><div><h2 className="text-sm font-semibold text-slate-200">How the rankings work</h2><p className="mt-1 text-xs leading-5 text-slate-500">Every completed scorecard contributes automatically. Rankings use your best call, average score, and completed sessions. Open any card to study the full scorecard and transcript.</p></div></div></section>
     </div>
     {selectedEntry ? <PublicScorecardModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} /> : null}
   </main>;
