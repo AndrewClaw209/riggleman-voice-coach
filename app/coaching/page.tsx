@@ -5,7 +5,7 @@ import VoiceChat from '@/components/VoiceChat';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
-import { addDoc, collection, doc, setDoc, increment } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, increment, query, setDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
 
@@ -20,6 +20,21 @@ interface SessionScorecard {
   improvements: string[];
 }
 
+interface RecentScorecard {
+  id: string;
+  scenario: Scenario;
+  endedAt?: string;
+  score: Score;
+  scorecard: SessionScorecard;
+  messages: ConversationMessage[];
+}
+
+const formatScorecardDate = (value?: string) => value
+  ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(value))
+  : 'Recent session';
+
+const scenarioLabel = (value: Scenario) => SCENARIOS[value]?.label || 'Coaching session';
+
 function CoachingPageContent() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -27,11 +42,31 @@ function CoachingPageContent() {
   const [score, setScore] = useState<Score>(emptyScore());
   const [scorecard, setScorecard] = useState<SessionScorecard | null>(null);
   const [showScorecardModal, setShowScorecardModal] = useState(false);
+  const [recentScorecards, setRecentScorecards] = useState<RecentScorecard[]>([]);
+  const [activeScorecardIndex, setActiveScorecardIndex] = useState(0);
+  const [selectedRecentScorecard, setSelectedRecentScorecard] = useState<RecentScorecard | null>(null);
+  const [isSessionActive, setIsSessionActive] = useState(false);
   const sessionId = useRef<string | null>(null);
   const sessionStatus = useRef<'active' | 'completed' | null>(null);
   const conversationRef = useRef<ConversationMessage[]>([]);
+  const deckDragStart = useRef<number | null>(null);
   const { user, userProfile, signOut } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!user) return;
+    getDocs(query(collection(db, 'sessions'), where('userId', '==', user.uid)))
+      .then((snapshot) => {
+        const completed = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() } as RecentScorecard & { status?: string }))
+          .filter((item) => item.status === 'completed' && item.scorecard && item.score)
+          .sort((a, b) => new Date(b.endedAt || 0).getTime() - new Date(a.endedAt || 0).getTime())
+          .slice(0, 3)
+          .map((item) => ({ ...item, messages: item.messages || [] }));
+        setRecentScorecards(completed);
+      })
+      .catch((error) => console.error('Could not load recent scorecards:', error));
+  }, [user]);
 
   const handleSessionStarted = async () => {
     if (!user || sessionStatus.current === 'active') return;
@@ -47,6 +82,7 @@ function CoachingPageContent() {
     });
     sessionId.current = ref.id;
     sessionStatus.current = 'active';
+    setIsSessionActive(true);
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
       email: user.email || '',
@@ -111,13 +147,36 @@ function CoachingPageContent() {
       endedAt,
       updatedAt: endedAt,
     }, { merge: true }).then(() => {
+      const recent: RecentScorecard = {
+        id: completedSessionId,
+        scenario,
+        endedAt,
+        score: result.score,
+        scorecard: { summary: result.summary, strengths: result.strengths, improvements: result.improvements },
+        messages: result.transcript,
+      };
+      setRecentScorecards((previous) => [recent, ...previous.filter((item) => item.id !== recent.id)].slice(0, 3));
+      setActiveScorecardIndex(0);
       sessionStatus.current = 'completed';
+      setIsSessionActive(false);
       sessionId.current = null;
       if (user) return setDoc(doc(db, 'users', user.uid), {
         totalSessions: increment(1),
         lastActive: endedAt,
       }, { merge: true });
     }).catch(console.error);
+  };
+
+  const openRecentScorecard = (item: RecentScorecard) => {
+    setSelectedRecentScorecard(item);
+    setScore(item.score);
+    setScorecard(item.scorecard);
+    setShowScorecardModal(true);
+  };
+
+  const rotateScorecards = (direction: 1 | -1) => {
+    if (recentScorecards.length < 2) return;
+    setActiveScorecardIndex((current) => (current + direction + recentScorecards.length) % recentScorecards.length);
   };
 
   const handleSignOut = async () => {
@@ -148,7 +207,7 @@ function CoachingPageContent() {
           <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#c58b2a]/70 bg-slate-800 p-4 sm:max-h-[90dvh] sm:p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#f2cd7f]">Session complete</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#f2cd7f]">{selectedRecentScorecard ? `${scenarioLabel(selectedRecentScorecard.scenario)} • ${formatScorecardDate(selectedRecentScorecard.endedAt)}` : 'Session complete'}</p>
                 <h2 id="scorecard-title" className="mt-1 text-xl font-bold text-white sm:text-2xl">Your Scorecard</h2>
               </div>
               <div className="flex items-start gap-3">
@@ -191,9 +250,22 @@ function CoachingPageContent() {
                 </ul>
               </div>
             )}
+            {selectedRecentScorecard && (
+              <details className="mt-5 rounded-xl bg-slate-900/60 p-4">
+                <summary className="cursor-pointer font-semibold text-slate-200">View conversation</summary>
+                <div className="mt-4 space-y-3">
+                  {selectedRecentScorecard.messages.map((message, index) => (
+                    <div key={`${message.content}-${index}`} className={`rounded-lg p-3 text-sm ${message.role === 'user' ? 'bg-emerald-900/50 text-emerald-100' : 'bg-slate-700 text-slate-200'}`}>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wider opacity-70">{message.role === 'user' ? 'You' : 'Customer'}</p>
+                      {message.content}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
             <button
               type="button"
-              onClick={() => setShowScorecardModal(false)}
+              onClick={() => { setShowScorecardModal(false); setSelectedRecentScorecard(null); }}
               className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#f2cd7f] to-[#c58b2a] px-4 py-3 font-semibold text-[#17120a] shadow-[0_6px_18px_rgba(226,167,63,0.25)] transition-colors hover:from-[#f7d995] hover:to-[#e2a73f]"
             >
               Close scorecard
@@ -260,44 +332,73 @@ function CoachingPageContent() {
         </div>
       </div>
 
-      {/* Sidebar - Only rendered on large screens */}
+      {/* Desktop activity panel: live transcript during a call, scorecard deck when idle */}
       {isLargeScreen && (
-        <div className="w-96 flex flex-col bg-slate-800 border-l border-slate-700 overflow-hidden">
-          <div className="p-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white">Conversation</h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Session #{userProfile?.totalSessions || 1} • {conversation.length} messages • Score {score.total}/30
-            </p>
-          </div>
-          {scorecard && (
-            <div className="p-4 border-b border-slate-700 bg-slate-900/40">
-              <h3 className="text-base font-semibold text-emerald-300">Session Scorecard</h3>
-              <p className="text-sm text-white mt-1">{scorecard.summary}</p>
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                {Object.entries(score).filter(([key]) => key !== 'total').map(([key, value]) => (
-                  <div key={key} className="rounded bg-slate-700/70 p-2">
-                    <p className="text-[11px] text-slate-400 capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                    <p className="text-lg font-bold text-white">{value}/5</p>
+        <aside className="w-96 shrink-0 border-l border-slate-700 bg-slate-800 p-5">
+          {isSessionActive ? (
+            <>
+              <div className="border-b border-slate-700 pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#f2cd7f]" />
+                  <h2 className="text-lg font-semibold text-white">Live conversation</h2>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">{conversation.length} messages captured</p>
+              </div>
+              <div className="flex max-h-[calc(100dvh-10rem)] flex-col gap-3 overflow-y-auto py-4">
+                {conversation.length === 0 ? <p className="text-sm text-slate-500">Your conversation will appear here as you speak.</p> : conversation.map((msg, idx) => (
+                  <div key={idx} className={`text-sm ${msg.role === 'user' ? 'text-[#f2cd7f]' : 'text-slate-300'}`}>
+                    <span className="font-semibold">{msg.role === 'user' ? 'You' : 'Customer'}: </span>{msg.content}
                   </div>
                 ))}
               </div>
-              {scorecard.strengths.length > 0 && <p className="text-xs text-emerald-200 mt-3"><span className="font-semibold">Strengths:</span> {scorecard.strengths.join(' • ')}</p>}
-              {scorecard.improvements.length > 0 && <p className="text-xs text-amber-200 mt-2"><span className="font-semibold">Next focus:</span> {scorecard.improvements.join(' • ')}</p>}
-            </div>
-          )}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {conversation.length === 0 ? (
-              <p className="text-slate-500 text-sm">Conversation will appear here...</p>
-            ) : (
-              conversation.map((msg, idx) => (
-                <div key={idx} className={`text-sm ${msg.role === 'user' ? 'text-blue-300' : 'text-slate-300'}`}>
-                  <span className="font-semibold">{msg.role === 'user' ? 'You' : 'Coach'}: </span>
-                  {msg.content}
+            </>
+          ) : (
+            <>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f2cd7f]">Your progress</p>
+                  <h2 className="mt-1 text-xl font-bold text-white">Recent scorecards</h2>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+                <button onClick={() => router.push('/progress')} className="text-xs font-semibold text-[#f2cd7f] hover:text-white">View all</button>
+              </div>
+              <p className="mt-2 text-sm text-slate-400">Drag the cards to revisit your latest sessions.</p>
+              {recentScorecards.length > 0 ? (
+                <div
+                  className="relative mt-5 h-[390px] touch-pan-y"
+                  onPointerDown={(event) => { deckDragStart.current = event.clientX; event.currentTarget.setPointerCapture(event.pointerId); }}
+                  onPointerUp={(event) => {
+                    if (deckDragStart.current === null) return;
+                    const distance = event.clientX - deckDragStart.current;
+                    if (Math.abs(distance) > 45) rotateScorecards(distance < 0 ? 1 : -1);
+                    deckDragStart.current = null;
+                  }}
+                >
+                  {recentScorecards.map((item, offset) => {
+                    const position = (offset - activeScorecardIndex + recentScorecards.length) % recentScorecards.length;
+                    return <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => position === 0 ? openRecentScorecard(item) : rotateScorecards(position === 1 ? 1 : -1)}
+                      className="absolute inset-x-0 top-0 flex h-[350px] cursor-grab flex-col rounded-2xl border border-[#c58b2a]/70 bg-gradient-to-br from-slate-700 to-slate-900 p-5 text-left shadow-2xl transition-all duration-300 active:cursor-grabbing"
+                      style={{ zIndex: recentScorecards.length - position, transform: `translateY(${position * 18}px) scale(${1 - position * 0.045})`, opacity: position === 0 ? 1 : 0.72 }}
+                      aria-label={`${scenarioLabel(item.scenario)} scorecard`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div><p className="text-xs font-semibold uppercase tracking-wider text-[#f2cd7f]">{formatScorecardDate(item.endedAt)}</p><h3 className="mt-2 text-lg font-bold text-white">{scenarioLabel(item.scenario)}</h3></div>
+                        <span className="text-3xl font-bold text-[#f2cd7f]">{item.score.total}<span className="text-sm font-normal text-slate-400">/30</span></span>
+                      </div>
+                      <p className="mt-5 line-clamp-4 text-sm leading-6 text-slate-300">{item.scorecard.summary}</p>
+                      <div className="mt-auto border-t border-slate-600 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Next focus</p><p className="mt-2 line-clamp-2 text-sm text-amber-100">{item.scorecard.improvements[0] || 'Keep building consistency.'}</p></div>
+                    </button>;
+                  })}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-600 p-6 text-center"><p className="text-sm text-slate-300">Your completed scorecards will stack here after your first call.</p><button onClick={() => router.push('/progress')} className="mt-4 text-sm font-semibold text-[#f2cd7f] hover:text-white">Open progress dashboard</button></div>
+              )}
+              {recentScorecards.length > 1 && <div className="flex items-center justify-center gap-3"><button onClick={() => rotateScorecards(-1)} className="rounded-full border border-slate-600 px-3 py-1 text-slate-300 hover:border-[#c58b2a] hover:text-white" aria-label="Previous scorecard">←</button><span className="text-xs text-slate-500">{activeScorecardIndex + 1} of {recentScorecards.length}</span><button onClick={() => rotateScorecards(1)} className="rounded-full border border-slate-600 px-3 py-1 text-slate-300 hover:border-[#c58b2a] hover:text-white" aria-label="Next scorecard">→</button></div>}
+            </>
+          )}
+        </aside>
       )}
     </div>
   );
