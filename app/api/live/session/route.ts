@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         session: {
           model: 'gpt-live-1',
           instructions: `${CURTIS_INSTRUCTIONS}\nScenario: ${SCENARIOS[scenario].label}. ${SCENARIOS[scenario].instruction}`,
-          audio: { output: { voice: 'marin' } },
+          audio: { output: { voice: 'cinder' } },
         },
         transport: { type: 'webrtc', sdp: body.sdp },
       }),
