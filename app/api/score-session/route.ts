@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You score an automotive sales role-play for a practical coaching scorecard. Scenario: ${SCENARIOS[scenario].label}. Score the salesperson only, from 0 to 5, on: ${SCORE_DIMENSIONS.join(', ')}. Return valid JSON with exactly these keys: ${SCORE_DIMENSIONS.join(', ')}, total, summary, strengths, improvements. total must equal the six scores added together. strengths and improvements must each be arrays of 2 or 3 concise strings. summary must be one concise sentence. Do not reward fabricated pricing, inventory, scarcity, or dealership claims.`,
+          content: `You score an automotive sales role-play for a practical coaching scorecard. The transcript uses role "user" for the human salesperson and role "assistant" for the AI customer. Scenario: ${SCENARIOS[scenario].label}. Score the salesperson only, from 0 to 5, on: ${SCORE_DIMENSIONS.join(', ')}. Evaluate how well the salesperson handled the customer; do not score or imitate the customer. Return valid JSON with exactly these keys: ${SCORE_DIMENSIONS.join(', ')}, total, summary, strengths, improvements. total must equal the six scores added together. strengths and improvements must each be arrays of 2 or 3 concise strings. summary must be one concise sentence. Do not reward fabricated pricing, inventory, scarcity, or dealership claims.`,
         },
         { role: 'user', content: JSON.stringify(transcript) },
       ],

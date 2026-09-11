@@ -490,7 +490,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
                   }`}
                 >
                   <p className="font-semibold text-xs mb-1 opacity-80">
-                    {msg.role === 'user' ? '🎤 You' : '🤖 Coach'}
+                    {msg.role === 'user' ? '🎤 You (Salesperson)' : `🤖 ${useLive ? 'Customer' : 'Coach'}`}
                   </p>
                   <p className="text-sm break-words whitespace-pre-wrap">
                     {msg.content}
@@ -544,7 +544,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
             <p>Live pilot enabled • standard recorder remains available if Live cannot connect</p>
             {processingStage === 'live' && (
               <p className="mt-1 text-slate-400" aria-live="polite">
-                Transcript captured: {liveCaptureCounts.user} salesperson response{liveCaptureCounts.user === 1 ? '' : 's'} · {liveCaptureCounts.assistant} coach response{liveCaptureCounts.assistant === 1 ? '' : 's'}
+                Transcript captured: {liveCaptureCounts.user} salesperson response{liveCaptureCounts.user === 1 ? '' : 's'} · {liveCaptureCounts.assistant} customer response{liveCaptureCounts.assistant === 1 ? '' : 's'}
               </p>
             )}
           </div>

@@ -1,9 +1,9 @@
 export const SCENARIOS = {
-  inbound: { label: 'Inbound Lead', instruction: 'Practice an inbound internet lead or phone pop.' },
-  best_price: { label: 'Best Price Objection', instruction: 'The customer is pressing for your best price before visiting.' },
-  usst: { label: 'Unsold Showroom Traffic', instruction: 'Call a customer who left without buying.' },
-  service_to_sales: { label: 'Service to Sales', instruction: 'Call a service customer with a compelling upgrade opportunity.' },
-  referral: { label: 'Referral Call', instruction: 'Ask a happy customer who they know that may be buying next.' },
+  inbound: { label: 'Inbound Lead', instruction: 'You are a new customer responding to an internet inquiry or phone pop.' },
+  best_price: { label: 'Best Price Objection', instruction: 'You are a customer pressing for the best price before agreeing to visit.' },
+  usst: { label: 'Unsold Showroom Traffic', instruction: 'You are a customer who left the showroom without buying and is now receiving a follow-up call.' },
+  service_to_sales: { label: 'Service to Sales', instruction: 'You are a service customer who may have an upgrade opportunity, but you are not yet committed to buying.' },
+  referral: { label: 'Referral Call', instruction: 'You are a happy customer being asked whether you know someone who may be buying next.' },
 } as const;
 
 export type Scenario = keyof typeof SCENARIOS;
