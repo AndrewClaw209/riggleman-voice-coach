@@ -15,11 +15,18 @@ interface ConversationMessage {
   content: string;
 }
 
+interface SessionScorecard {
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+}
+
 function CoachingPageContent() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [scenario, setScenario] = useState<Scenario>('inbound');
   const [score, setScore] = useState<Score>(emptyScore());
+  const [scorecard, setScorecard] = useState<SessionScorecard | null>(null);
   const sessionId = useRef<string | null>(null);
   const { user, userProfile, signOut } = useAuth();
   const router = useRouter();
@@ -72,6 +79,17 @@ function CoachingPageContent() {
     await updateDoc(doc(db, 'sessions', sessionId.current), {
       messages: [...conversation, { role: 'user', content: turn.userText }, { role: 'assistant', content: turn.coachResponse }],
       score: turn.score, scenario, updatedAt: new Date().toISOString(),
+    }).catch(console.error);
+  };
+
+  const handleSessionScored = async (result: { score: Score; summary: string; strengths: string[]; improvements: string[] }) => {
+    setScore(result.score);
+    setScorecard({ summary: result.summary, strengths: result.strengths, improvements: result.improvements });
+    if (!sessionId.current) return;
+    await updateDoc(doc(db, 'sessions', sessionId.current), {
+      score: result.score,
+      scorecard: { summary: result.summary, strengths: result.strengths, improvements: result.improvements },
+      updatedAt: new Date().toISOString(),
     }).catch(console.error);
   };
 
@@ -133,7 +151,27 @@ function CoachingPageContent() {
 
         {/* Voice Chat Component */}
         <div className="flex-1 flex flex-col min-h-0">
-          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} onTurnComplete={handleTurnComplete} scenario={scenario} />
+          {scorecard && (
+            <div className="shrink-0 mx-4 mt-3 rounded-xl border border-emerald-700/60 bg-slate-800 p-4 shadow-lg lg:hidden">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-emerald-300">Session Scorecard</h2>
+                  <p className="text-sm text-slate-200 mt-1">{scorecard.summary}</p>
+                </div>
+                <span className="text-xl font-bold text-white shrink-0">{score.total}/30</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {Object.entries(score).filter(([key]) => key !== 'total').map(([key, value]) => (
+                  <div key={key} className="rounded bg-slate-700/70 p-2">
+                    <p className="text-[10px] text-slate-400 capitalize truncate">{key.replace(/([A-Z])/g, ' $1')}</p>
+                    <p className="text-base font-bold text-white">{value}/5</p>
+                  </div>
+                ))}
+              </div>
+              {scorecard.improvements.length > 0 && <p className="text-xs text-amber-200 mt-3"><span className="font-semibold">Next focus:</span> {scorecard.improvements.join(' • ')}</p>}
+            </div>
+          )}
+          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} onTurnComplete={handleTurnComplete} onSessionScored={handleSessionScored} scenario={scenario} />
         </div>
       </div>
 
@@ -146,6 +184,22 @@ function CoachingPageContent() {
               Session #{userProfile?.totalSessions || 1} • {conversation.length} messages • Score {score.total}/30
             </p>
           </div>
+          {scorecard && (
+            <div className="p-4 border-b border-slate-700 bg-slate-900/40">
+              <h3 className="text-base font-semibold text-emerald-300">Session Scorecard</h3>
+              <p className="text-sm text-white mt-1">{scorecard.summary}</p>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                {Object.entries(score).filter(([key]) => key !== 'total').map(([key, value]) => (
+                  <div key={key} className="rounded bg-slate-700/70 p-2">
+                    <p className="text-[11px] text-slate-400 capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
+                    <p className="text-lg font-bold text-white">{value}/5</p>
+                  </div>
+                ))}
+              </div>
+              {scorecard.strengths.length > 0 && <p className="text-xs text-emerald-200 mt-3"><span className="font-semibold">Strengths:</span> {scorecard.strengths.join(' • ')}</p>}
+              {scorecard.improvements.length > 0 && <p className="text-xs text-amber-200 mt-2"><span className="font-semibold">Next focus:</span> {scorecard.improvements.join(' • ')}</p>}
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {conversation.length === 0 ? (
               <p className="text-slate-500 text-sm">Conversation will appear here...</p>

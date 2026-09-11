@@ -12,12 +12,13 @@ type ConversationMessage = {
 interface VoiceChatProps {
   onTranscriptUpdate: (message: ConversationMessage) => void;
   onTurnComplete?: (turn: { userText: string; coachResponse: string; score: Score }) => void;
+  onSessionScored?: (result: { score: Score; summary: string; strengths: string[]; improvements: string[] }) => void;
   scenario: Scenario;
 }
 
 type ProcessingStage = 'idle' | 'connecting' | 'live' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
 
-export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario }: VoiceChatProps) {
+export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessionScored, scenario }: VoiceChatProps) {
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
@@ -29,6 +30,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
   const livePeerRef = useRef<RTCPeerConnection | null>(null);
   const liveChannelRef = useRef<RTCDataChannel | null>(null);
   const liveStreamRef = useRef<MediaStream | null>(null);
+  const liveTranscriptRef = useRef<ConversationMessage[]>([]);
   const { user } = useAuth();
   const liveEnabled = process.env.NEXT_PUBLIC_ENABLE_LIVE_COACHING === 'true';
   const [useLive, setUseLive] = useState(liveEnabled);
@@ -108,12 +110,14 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
       // the existing conversation UI work for both transport modes.
       if (payload.type === 'conversation.item.input_audio_transcription.completed') {
         setLastUserText(text);
+        liveTranscriptRef.current.push({ role: 'user', content: text });
         onTranscriptUpdate({ role: 'user', content: text });
       } else if (
         payload.type === 'response.audio_transcript.done' ||
         payload.type === 'response.output_audio_transcript.done' ||
         payload.type === 'response.text.done'
       ) {
+        liveTranscriptRef.current.push({ role: 'assistant', content: text });
         onTranscriptUpdate({ role: 'assistant', content: text });
       }
     } catch {
@@ -124,6 +128,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
   const startLiveSession = async () => {
     let stream: MediaStream | null = null;
     try {
+      liveTranscriptRef.current = [];
       setError(null);
       setProcessingStage('connecting');
       primeAudio();
@@ -175,6 +180,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
   };
 
   const stopLiveSession = () => {
+    const transcript = liveTranscriptRef.current;
     liveChannelRef.current?.close();
     livePeerRef.current?.close();
     liveStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -183,6 +189,34 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
     liveStreamRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
     setProcessingStage('idle');
+    if (transcript.some((message) => message.role === 'user')) {
+      void scoreLiveSession(transcript);
+    }
+  };
+
+  const scoreLiveSession = async (transcript: ConversationMessage[]) => {
+    try {
+      setProcessingStage('thinking');
+      const token = await user?.getIdToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+      const response = await fetch('/api/score-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ transcript, scenario }),
+      });
+      const result = await response.json() as { error?: string; score?: Score; summary?: string; strengths?: string[]; improvements?: string[] };
+      if (!response.ok || !result.score) throw new Error(result.error || 'Could not generate scorecard');
+      onSessionScored?.({
+        score: result.score,
+        summary: result.summary || '',
+        strengths: result.strengths || [],
+        improvements: result.improvements || [],
+      });
+      setProcessingStage('idle');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not generate scorecard');
+      setProcessingStage('error');
+    }
   };
 
   useEffect(() => () => {
