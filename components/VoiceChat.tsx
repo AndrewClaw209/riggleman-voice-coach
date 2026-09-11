@@ -15,7 +15,7 @@ interface VoiceChatProps {
   scenario: Scenario;
 }
 
-type ProcessingStage = 'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
+type ProcessingStage = 'idle' | 'connecting' | 'live' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
 
 export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario }: VoiceChatProps) {
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
@@ -26,7 +26,12 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const livePeerRef = useRef<RTCPeerConnection | null>(null);
+  const liveChannelRef = useRef<RTCDataChannel | null>(null);
+  const liveStreamRef = useRef<MediaStream | null>(null);
   const { user } = useAuth();
+  const liveEnabled = process.env.NEXT_PUBLIC_ENABLE_LIVE_COACHING === 'true';
+  const [useLive, setUseLive] = useState(liveEnabled);
 
   // 44-byte zero-length WAV — used once, synchronously in a user-gesture
   // handler, to unlock the Audio element on iOS Safari so later programmatic
@@ -91,6 +96,100 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
       setProcessingStage('transcribing');
     }
   };
+
+  const handleLiveEvent = (event: MessageEvent) => {
+    try {
+      const payload = JSON.parse(event.data as string) as { type?: string; transcript?: string; delta?: string };
+      const text = payload.transcript?.trim();
+      if (!text) return;
+
+      // Live emits finalized transcript events for both sides. Keeping these
+      // events in the same transcript callback makes Firestore persistence and
+      // the existing conversation UI work for both transport modes.
+      if (payload.type === 'conversation.item.input_audio_transcription.completed') {
+        setLastUserText(text);
+        onTranscriptUpdate({ role: 'user', content: text });
+      } else if (
+        payload.type === 'response.audio_transcript.done' ||
+        payload.type === 'response.output_audio_transcript.done' ||
+        payload.type === 'response.text.done'
+      ) {
+        onTranscriptUpdate({ role: 'assistant', content: text });
+      }
+    } catch {
+      // Ignore non-JSON browser events; the audio connection can continue.
+    }
+  };
+
+  const startLiveSession = async () => {
+    let stream: MediaStream | null = null;
+    try {
+      setError(null);
+      setProcessingStage('connecting');
+      primeAudio();
+      const token = await user?.getIdToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+
+      const microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = microphone;
+      liveStreamRef.current = microphone;
+      const peer = new RTCPeerConnection();
+      livePeerRef.current = peer;
+      peer.ontrack = (event) => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        audio.srcObject = event.streams[0];
+        audio.play().catch((err) => console.warn('[VoiceChat] Live audio play failed:', err));
+      };
+      microphone.getTracks().forEach((track) => peer.addTrack(track, microphone));
+
+      const channel = peer.createDataChannel('oai-events');
+      liveChannelRef.current = channel;
+      channel.addEventListener('message', handleLiveEvent);
+      channel.addEventListener('open', () => setProcessingStage('live'));
+      channel.addEventListener('error', () => setError('Live voice connection failed. Try the standard recorder.'));
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      const response = await fetch('/api/live/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sdp: offer.sdp, scenario }),
+      });
+      const result = await response.json() as { error?: string; transport?: { sdp?: string }; sdp?: string };
+      if (!response.ok) throw new Error(result.error || 'Could not start live coaching');
+      const answerSdp = result.transport?.sdp || result.sdp;
+      if (!answerSdp) throw new Error('Live session returned no SDP answer');
+      await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      setProcessingStage('live');
+    } catch (err) {
+      stream?.getTracks().forEach((track) => track.stop());
+      livePeerRef.current?.close();
+      livePeerRef.current = null;
+      liveChannelRef.current = null;
+      liveStreamRef.current = null;
+      setError(err instanceof Error ? err.message : 'Could not start live coaching');
+      setUseLive(false);
+      setProcessingStage('error');
+    }
+  };
+
+  const stopLiveSession = () => {
+    liveChannelRef.current?.close();
+    livePeerRef.current?.close();
+    liveStreamRef.current?.getTracks().forEach((track) => track.stop());
+    liveChannelRef.current = null;
+    livePeerRef.current = null;
+    liveStreamRef.current = null;
+    if (audioRef.current) audioRef.current.srcObject = null;
+    setProcessingStage('idle');
+  };
+
+  useEffect(() => () => {
+    liveChannelRef.current?.close();
+    livePeerRef.current?.close();
+    liveStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   const playBufferedAudio = async (stream: ReadableStream<Uint8Array>) => {
     const audio = audioRef.current;
@@ -199,6 +298,8 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
 
   // Stage info for display
   const stageInfo = {
+    connecting: { emoji: '🔗', text: 'Connecting live coach...', color: 'bg-blue-600' },
+    live: { emoji: '🟢', text: 'Live coaching', color: 'bg-emerald-600' },
     recording: { emoji: '🎤', text: 'Recording...', color: 'bg-red-600' },
     transcribing: { emoji: '📝', text: 'Transcribing...', color: 'bg-blue-600' },
     thinking: { emoji: '💭', text: 'Thinking...', color: 'bg-yellow-600' },
@@ -317,7 +418,16 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
           paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
         }}
       >
-        {!isRecording ? (
+        {liveEnabled && useLive ? (
+          <button
+            onClick={processingStage === 'live' ? stopLiveSession : startLiveSession}
+            disabled={processingStage === 'connecting' || isProcessing && processingStage !== 'live'}
+            className={`w-full py-4 px-6 ${processingStage === 'live' ? 'bg-red-700 hover:bg-red-600' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600'} disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-50 text-white font-bold text-lg rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3`}
+          >
+            <span className="text-2xl">{processingStage === 'live' ? '⏹️' : '🟢'}</span>
+            <span>{processingStage === 'live' ? 'End Live Coaching' : 'Start Live Coaching'}</span>
+          </button>
+        ) : !isRecording ? (
           <button
             onClick={startRecording}
             disabled={isProcessing}
@@ -335,6 +445,8 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
             <span>Stop &amp; Process</span>
           </button>
         )}
+
+        {liveEnabled && useLive && <p className="text-xs text-slate-500 text-center mt-2">Live pilot enabled • standard recorder remains available if Live cannot connect</p>}
 
         {hasConversation && (
           <p className="text-xs text-slate-500 text-center mt-2">

@@ -89,7 +89,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 1. Push your code to a Git repository (GitHub, GitLab, etc.)
 2. Import the project to [Vercel](https://vercel.com)
 3. Add `OPENAI_API_KEY` to Environment Variables
-4. Deploy
+4. To enable the GPT-Live pilot, add `NEXT_PUBLIC_ENABLE_LIVE_COACHING=true`. Leave it unset or set it to `false` to use the existing recorder.
+5. Deploy
 
 ### Other Platforms
 
