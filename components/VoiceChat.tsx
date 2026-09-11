@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-import type { Scenario, Score } from '@/lib/coaching';
+import { SCENARIOS, type Scenario, type Score } from '@/lib/coaching';
 
 type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -195,7 +195,19 @@ export default function VoiceChat({ onTranscriptUpdate, onSessionStarted, onTurn
       const channel = peer.createDataChannel('oai-events');
       liveChannelRef.current = channel;
       channel.addEventListener('message', handleLiveEvent);
-      channel.addEventListener('open', () => setProcessingStage('live'));
+      channel.addEventListener('open', () => {
+        setProcessingStage('live');
+        // GPT Live does not speak until a response is requested. Ask for a
+        // short, scenario-specific welcome so the user immediately knows the
+        // connection worked and exactly how to begin the role-play.
+        channel.send(JSON.stringify({
+          type: 'response.create',
+          response: {
+            modalities: ['audio', 'text'],
+            instructions: SCENARIOS[scenario].welcome,
+          },
+        }));
+      });
       channel.addEventListener('error', () => setError('Live voice connection failed. Try the standard recorder.'));
 
       const offer = await peer.createOffer();
@@ -477,11 +489,10 @@ export default function VoiceChat({ onTranscriptUpdate, onSessionStarted, onTurn
           {processingStage === 'idle' && !hasConversation && (
             <div className="text-center mb-6 max-w-sm">
               <p className="text-base text-slate-300 font-semibold mb-2">
-                Ready to get coached?
+                Pick a scenario, then start live coaching
               </p>
               <p className="text-sm text-slate-400">
-                Tap the button below and speak naturally. The AI will listen,
-                understand, and give you instant feedback.
+                Curtis will answer the phone and explain the role-play when you connect. After he finishes, start the call as the salesperson.
               </p>
               <div className="relative mx-auto mt-6 h-112 w-112 max-w-[calc(100vw-2rem)]">
                 <Image
@@ -537,7 +548,7 @@ export default function VoiceChat({ onTranscriptUpdate, onSessionStarted, onTurn
             className={`w-full py-4 px-6 ${processingStage === 'live' ? 'bg-red-700 hover:bg-red-600' : 'bg-gradient-to-r from-[#f2cd7f] to-[#c58b2a] hover:from-[#f7d995] hover:to-[#e2a73f] text-[#17120a] shadow-[0_8px_24px_rgba(226,167,63,0.3)]'} disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-50 font-bold text-lg rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3`}
           >
             {processingStage === 'live' && <span className="text-2xl">⏹️</span>}
-            <span>{processingStage === 'live' ? 'End Live Coaching' : 'Start Live Coaching'}</span>
+            <span>{processingStage === 'live' ? 'End Live Coaching' : '2. Start Live Coaching'}</span>
           </button>
         ) : !isRecording ? (
           <button
@@ -562,7 +573,10 @@ export default function VoiceChat({ onTranscriptUpdate, onSessionStarted, onTurn
           <div className="mt-2 text-center text-xs text-slate-500">
             {processingStage === 'live' && (
               <p className="mt-1 text-slate-400" aria-live="polite">
-                Transcript captured: {liveCaptureCounts.user} salesperson response{liveCaptureCounts.user === 1 ? '' : 's'} · {liveCaptureCounts.assistant} customer response{liveCaptureCounts.assistant === 1 ? '' : 's'}
+                Curtis is on the line. Listen to his welcome, then begin as the salesperson.
+                <span className="block mt-1 text-slate-500">
+                  {liveCaptureCounts.user} salesperson response{liveCaptureCounts.user === 1 ? '' : 's'} · {liveCaptureCounts.assistant} customer response{liveCaptureCounts.assistant === 1 ? '' : 's'} captured
+                </span>
               </p>
             )}
           </div>

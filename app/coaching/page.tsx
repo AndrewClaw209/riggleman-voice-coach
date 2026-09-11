@@ -294,7 +294,7 @@ function CoachingPageContent() {
     </div>
           <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
             <label className="flex min-w-0 flex-1 flex-col items-start gap-1 text-xs font-medium text-slate-400 sm:flex-none sm:flex-row sm:items-center sm:gap-2">
-              <span className="shrink-0">Pick a scenario for better context</span>
+              <span className="shrink-0">1. Pick a scenario for better context</span>
               <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="w-full min-w-0 rounded bg-slate-700 px-2 py-2 text-sm text-white sm:w-auto">
                 {Object.entries(SCENARIOS).map(([value, details]) => <option key={value} value={value}>{details.label}</option>)}
               </select>
