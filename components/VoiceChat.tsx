@@ -544,7 +544,6 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
 
         {liveEnabled && useLive && (
           <div className="mt-2 text-center text-xs text-slate-500">
-            <p>Live pilot enabled • standard recorder remains available if Live cannot connect</p>
             {processingStage === 'live' && (
               <p className="mt-1 text-slate-400" aria-live="polite">
                 Transcript captured: {liveCaptureCounts.user} salesperson response{liveCaptureCounts.user === 1 ? '' : 's'} · {liveCaptureCounts.assistant} customer response{liveCaptureCounts.assistant === 1 ? '' : 's'}
@@ -559,6 +558,10 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
             {conversation.length / 2 !== 1 ? 's' : ''}
           </p>
         )}
+
+        <footer className="mt-3 border-t border-slate-800 pt-2 text-center text-[11px] tracking-wide text-slate-500">
+          AWEVO Software Solutions
+        </footer>
       </div>
 
       {showEndConfirmation && (
