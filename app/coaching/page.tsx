@@ -5,7 +5,7 @@ import VoiceChat from '@/components/VoiceChat';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
-import { addDoc, collection, doc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
 
@@ -28,30 +28,33 @@ function CoachingPageContent() {
   const [scorecard, setScorecard] = useState<SessionScorecard | null>(null);
   const [showScorecardModal, setShowScorecardModal] = useState(false);
   const sessionId = useRef<string | null>(null);
+  const sessionStatus = useRef<'active' | 'completed' | null>(null);
+  const conversationRef = useRef<ConversationMessage[]>([]);
   const { user, userProfile, signOut } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!user || sessionId.current) return;
-    addDoc(collection(db, 'sessions'), {
-      userId: user.uid, scenario, status: 'active', messages: [], score: emptyScore(),
-      startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }).then((ref) => { sessionId.current = ref.id; }).catch(console.error);
-    // A user may have authenticated before their profile was written (or may
-    // be an account created before profiles were introduced). `updateDoc`
-    // fails when the document does not exist; merge writes create it safely.
-    setDoc(doc(db, 'users', user.uid), {
+  const handleSessionStarted = async () => {
+    if (!user || sessionStatus.current === 'active') return;
+    const now = new Date().toISOString();
+    const ref = await addDoc(collection(db, 'sessions'), {
+      userId: user.uid,
+      scenario,
+      status: 'active',
+      messages: [],
+      score: emptyScore(),
+      startedAt: now,
+      updatedAt: now,
+    });
+    sessionId.current = ref.id;
+    sessionStatus.current = 'active';
+    await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
       email: user.email || '',
       displayName: user.displayName || 'Sales Rep',
       role: 'sales_rep',
-      dealership: '',
-      totalSessions: increment(1),
-      totalMessages: 0,
-      createdAt: new Date().toISOString(),
-      lastActive: new Date().toISOString(),
-    }, { merge: true }).catch(console.error);
-  }, [user, scenario]);
+      lastActive: now,
+    }, { merge: true });
+  };
 
   // Check screen size - hide sidebar on mobile
   useEffect(() => {
@@ -62,7 +65,16 @@ function CoachingPageContent() {
   }, []);
 
   const handleTranscriptUpdate = (message: ConversationMessage) => {
-    setConversation((prev) => [...prev, message]);
+    const nextConversation = [...conversationRef.current, message];
+    conversationRef.current = nextConversation;
+    setConversation(nextConversation);
+
+    if (sessionId.current && user) {
+      setDoc(doc(db, 'sessions', sessionId.current), {
+        messages: nextConversation,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true }).catch(console.error);
+    }
     
     // Track message count
     if (user && message.role === 'user') {
@@ -76,23 +88,35 @@ function CoachingPageContent() {
   const handleTurnComplete = async (turn: { userText: string; coachResponse: string; score: Score }) => {
     setScore(turn.score);
     if (!sessionId.current || !user) return;
-    await updateDoc(doc(db, 'sessions', sessionId.current), {
-      messages: [...conversation, { role: 'user', content: turn.userText }, { role: 'assistant', content: turn.coachResponse }],
+    await setDoc(doc(db, 'sessions', sessionId.current), {
+      messages: conversationRef.current.length > 0 ? conversationRef.current : [
+        { role: 'user', content: turn.userText }, { role: 'assistant', content: turn.coachResponse },
+      ],
       score: turn.score, scenario, updatedAt: new Date().toISOString(),
-    }).catch(console.error);
+    }, { merge: true }).catch(console.error);
   };
 
-  const handleSessionScored = async (result: { score: Score; summary: string; strengths: string[]; improvements: string[] }) => {
+  const handleSessionScored = async (result: { score: Score; summary: string; strengths: string[]; improvements: string[]; transcript: ConversationMessage[] }) => {
     setScore(result.score);
     setScorecard({ summary: result.summary, strengths: result.strengths, improvements: result.improvements });
     setShowScorecardModal(true);
     if (!sessionId.current) return;
-    await updateDoc(doc(db, 'sessions', sessionId.current), {
+    const completedSessionId = sessionId.current;
+    const endedAt = new Date().toISOString();
+    await setDoc(doc(db, 'sessions', completedSessionId), {
       status: 'completed',
+      messages: result.transcript,
       score: result.score,
       scorecard: { summary: result.summary, strengths: result.strengths, improvements: result.improvements },
-      endedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      endedAt,
+      updatedAt: endedAt,
+    }, { merge: true }).then(() => {
+      sessionStatus.current = 'completed';
+      sessionId.current = null;
+      if (user) return setDoc(doc(db, 'users', user.uid), {
+        totalSessions: increment(1),
+        lastActive: endedAt,
+      }, { merge: true });
     }).catch(console.error);
   };
 
@@ -186,6 +210,12 @@ function CoachingPageContent() {
               </select>
             </label>
             <button
+              onClick={() => router.push('/progress')}
+              className="shrink-0 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition-colors hover:border-[#c58b2a] hover:text-white"
+            >
+              Progress
+            </button>
+            <button
               onClick={handleSignOut}
               className="shrink-0 px-2 py-2 text-sm text-slate-400 transition-colors hover:text-white"
             >
@@ -226,7 +256,7 @@ function CoachingPageContent() {
               {scorecard.improvements.length > 0 && <p className="text-xs text-amber-200 mt-3"><span className="font-semibold">Next focus:</span> {scorecard.improvements.join(' • ')}</p>}
             </div>
           )}
-          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} onTurnComplete={handleTurnComplete} onSessionScored={handleSessionScored} scenario={scenario} />
+          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} onSessionStarted={handleSessionStarted} onTurnComplete={handleTurnComplete} onSessionScored={handleSessionScored} scenario={scenario} />
         </div>
       </div>
 

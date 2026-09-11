@@ -12,14 +12,15 @@ type ConversationMessage = {
 
 interface VoiceChatProps {
   onTranscriptUpdate: (message: ConversationMessage) => void;
+  onSessionStarted?: () => void | Promise<void>;
   onTurnComplete?: (turn: { userText: string; coachResponse: string; score: Score }) => void;
-  onSessionScored?: (result: { score: Score; summary: string; strengths: string[]; improvements: string[] }) => void;
+  onSessionScored?: (result: { score: Score; summary: string; strengths: string[]; improvements: string[]; transcript: ConversationMessage[] }) => void;
   scenario: Scenario;
 }
 
 type ProcessingStage = 'idle' | 'connecting' | 'live' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
 
-export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessionScored, scenario }: VoiceChatProps) {
+export default function VoiceChat({ onTranscriptUpdate, onSessionStarted, onTurnComplete, onSessionScored, scenario }: VoiceChatProps) {
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
@@ -66,6 +67,8 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
           autoGainControl: true,
         },
       });
+
+      await onSessionStarted?.();
 
       const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
         .find((type) => MediaRecorder.isTypeSupported(type));
@@ -178,6 +181,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
       const microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream = microphone;
       liveStreamRef.current = microphone;
+      await onSessionStarted?.();
       const peer = new RTCPeerConnection();
       livePeerRef.current = peer;
       peer.ontrack = (event) => {
@@ -271,6 +275,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
         summary: result.summary || '',
         strengths: result.strengths || [],
         improvements: result.improvements || [],
+        transcript,
       });
       setProcessingStage('idle');
     } catch (err) {
