@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { addDoc, collection, doc, getDocs, increment, query, setDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
+import { buildLeaderboardEntry } from '@/lib/leaderboard';
 
 interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -146,7 +147,7 @@ function CoachingPageContent() {
       scorecard: { summary: result.summary, strengths: result.strengths, improvements: result.improvements },
       endedAt,
       updatedAt: endedAt,
-    }, { merge: true }).then(() => {
+    }, { merge: true }).then(async () => {
       const recent: RecentScorecard = {
         id: completedSessionId,
         scenario,
@@ -160,10 +161,18 @@ function CoachingPageContent() {
       sessionStatus.current = 'completed';
       setIsSessionActive(false);
       sessionId.current = null;
-      if (user) return setDoc(doc(db, 'users', user.uid), {
+      if (user) await setDoc(doc(db, 'users', user.uid), {
         totalSessions: increment(1),
         lastActive: endedAt,
       }, { merge: true });
+      if (user && userProfile?.leaderboardOptIn) {
+        const snapshot = await getDocs(query(collection(db, 'sessions'), where('userId', '==', user.uid)));
+        const completed = snapshot.docs.map((item) => item.data())
+          .filter((item) => item.status === 'completed' && item.scorecard && item.score && typeof item.score.total === 'number')
+          .map((item) => ({ score: item.score as Score, scenario: item.scenario as Scenario, endedAt: item.endedAt as string | undefined }));
+        const entry = buildLeaderboardEntry(user.uid, user.displayName || 'Sales Rep', completed);
+        if (entry) await setDoc(doc(db, 'leaderboard', user.uid), entry);
+      }
     }).catch(console.error);
   };
 
@@ -287,6 +296,7 @@ function CoachingPageContent() {
             >
               Progress
             </button>
+            <button onClick={() => router.push('/leaderboard')} className="shrink-0 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition-colors hover:border-[#c58b2a] hover:text-white">Leaderboard</button>
             <button
               onClick={handleSignOut}
               className="shrink-0 px-2 py-2 text-sm text-slate-400 transition-colors hover:text-white"

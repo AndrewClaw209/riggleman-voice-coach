@@ -72,6 +72,7 @@ function ProgressPageContent() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => router.push('/coaching')} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-[#c58b2a] hover:text-white">Coach</button>
+            <button onClick={() => router.push('/leaderboard')} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-[#c58b2a] hover:text-white">Leaderboard</button>
             <button onClick={handleSignOut} className="px-2 py-2 text-sm text-slate-400 hover:text-white">Sign out</button>
           </div>
         </div>

@@ -22,6 +22,7 @@ interface UserProfile {
   lastActive: string;
   totalSessions: number;
   totalMessages: number;
+  leaderboardOptIn?: boolean;
 }
 
 interface AuthContextType {
@@ -99,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       lastActive: new Date().toISOString(),
       totalSessions: 0,
       totalMessages: 0,
+      leaderboardOptIn: false,
     };
 
     await setDoc(doc(db, 'users', user.uid), userProfile);
