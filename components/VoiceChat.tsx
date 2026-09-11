@@ -24,6 +24,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
   const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
   const [lastUserText, setLastUserText] = useState<string>('');
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
+  const [liveCaptureCounts, setLiveCaptureCounts] = useState({ user: 0, assistant: 0 });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -103,41 +104,58 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
 
   const handleLiveEvent = (event: MessageEvent) => {
     try {
-      const payload = JSON.parse(event.data as string) as { type?: string; transcript?: string; delta?: string };
+      const payload = JSON.parse(event.data as string) as {
+        type?: string;
+        transcript?: string;
+        delta?: string;
+      };
       const type = payload.type || '';
-      const isUser = type === 'conversation.item.input_audio_transcription.delta' ||
+      // Live emits these events independently from the audio stream. Keeping
+      // them explicit is important: hearing audio does not mean we captured
+      // text for the scorecard.
+      const isUserDelta = type === 'session.input_transcript.delta' ||
+        type === 'conversation.item.input_audio_transcription.delta';
+      const isUserFinal = type === 'session.input_transcript.done' ||
+        type === 'session.input_transcript.completed' ||
         type === 'conversation.item.input_audio_transcription.completed';
-      const isUserDelta = type === 'conversation.item.input_audio_transcription.delta';
-      const isAssistantDelta = type === 'response.audio_transcript.delta' ||
+      const isAssistantDelta = type === 'session.output_transcript.delta' ||
+        type === 'response.audio_transcript.delta' ||
         type === 'response.output_audio_transcript.delta' ||
         type === 'response.text.delta';
-      const isAssistantFinal = type === 'response.audio_transcript.done' ||
+      const isAssistantFinal = type === 'session.output_transcript.done' ||
+        type === 'session.output_transcript.completed' ||
+        type === 'response.audio_transcript.done' ||
         type === 'response.output_audio_transcript.done' ||
         type === 'response.text.done';
 
-      if (!isUser && !isAssistantDelta && !isAssistantFinal) return;
+      if (!isUserDelta && !isUserFinal && !isAssistantDelta && !isAssistantFinal) return;
 
-      const role = isUser ? 'user' : 'assistant';
+      const role = isUserDelta || isUserFinal ? 'user' : 'assistant';
       const partial = livePartialTranscriptRef.current[role];
-      const incoming = (payload.delta || '').trim();
-      const finalized = (payload.transcript || '').trim();
+      const incoming = payload.delta || '';
+      const finalized = payload.transcript || '';
 
       if (isUserDelta || isAssistantDelta) {
         if (!incoming) return;
-        livePartialTranscriptRef.current[role] = `${partial}${partial && !/\s$/.test(partial) ? ' ' : ''}${incoming}`;
+        livePartialTranscriptRef.current[role] = `${partial}${incoming}`;
         return;
       }
 
       // Final events may contain the complete transcript, or may only signal
       // completion after a sequence of delta events. Prefer the complete text
       // and fall back to the accumulated partial transcript.
-      const text = finalized || livePartialTranscriptRef.current[role].trim();
+      const text = (finalized || livePartialTranscriptRef.current[role]).trim();
       livePartialTranscriptRef.current[role] = '';
       if (!text) return;
 
       const message: ConversationMessage = { role, content: text };
+      // A provider can send a completed transcript after the final delta.
+      // Do not add the same utterance twice.
+      const previous = liveTranscriptRef.current[liveTranscriptRef.current.length - 1];
+      if (previous?.role === role && previous.content === text) return;
       liveTranscriptRef.current.push(message);
       onTranscriptUpdate(message);
+      setLiveCaptureCounts((counts) => ({ ...counts, [role]: counts[role] + 1 }));
       if (role === 'user') setLastUserText(text);
     } catch {
       // Ignore non-JSON browser events; the audio connection can continue.
@@ -149,6 +167,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
     try {
       liveTranscriptRef.current = [];
       livePartialTranscriptRef.current = { user: '', assistant: '' };
+      setLiveCaptureCounts({ user: 0, assistant: 0 });
       setError(null);
       setProcessingStage('connecting');
       primeAudio();
@@ -215,6 +234,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
         const message: ConversationMessage = { role, content: pending };
         transcript.push(message);
         onTranscriptUpdate(message);
+        setLiveCaptureCounts((counts) => ({ ...counts, [role]: counts[role] + 1 }));
       }
     }
     livePartialTranscriptRef.current = { user: '', assistant: '' };
@@ -519,7 +539,16 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
           </button>
         )}
 
-        {liveEnabled && useLive && <p className="text-xs text-slate-500 text-center mt-2">Live pilot enabled • standard recorder remains available if Live cannot connect</p>}
+        {liveEnabled && useLive && (
+          <div className="mt-2 text-center text-xs text-slate-500">
+            <p>Live pilot enabled • standard recorder remains available if Live cannot connect</p>
+            {processingStage === 'live' && (
+              <p className="mt-1 text-slate-400" aria-live="polite">
+                Transcript captured: {liveCaptureCounts.user} salesperson response{liveCaptureCounts.user === 1 ? '' : 's'} · {liveCaptureCounts.assistant} coach response{liveCaptureCounts.assistant === 1 ? '' : 's'}
+              </p>
+            )}
+          </div>
+        )}
 
         {hasConversation && (
           <p className="text-xs text-slate-500 text-center mt-2">
