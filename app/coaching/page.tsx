@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import VoiceChat from '@/components/VoiceChat';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
 
 interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -17,18 +18,20 @@ interface ConversationMessage {
 function CoachingPageContent() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const [scenario, setScenario] = useState<Scenario>('inbound');
+  const [score, setScore] = useState<Score>(emptyScore());
+  const sessionId = useRef<string | null>(null);
   const { user, userProfile, signOut } = useAuth();
   const router = useRouter();
 
-  // Track session start
   useEffect(() => {
-    if (user) {
-      updateDoc(doc(db, 'users', user.uid), {
-        totalSessions: increment(1),
-        lastActive: new Date().toISOString(),
-      }).catch(console.error);
-    }
-  }, [user]);
+    if (!user || sessionId.current) return;
+    addDoc(collection(db, 'sessions'), {
+      userId: user.uid, scenario, status: 'active', messages: [], score: emptyScore(),
+      startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    }).then((ref) => { sessionId.current = ref.id; }).catch(console.error);
+    updateDoc(doc(db, 'users', user.uid), { totalSessions: increment(1), lastActive: new Date().toISOString() }).catch(console.error);
+  }, [user, scenario]);
 
   // Check screen size - hide sidebar on mobile
   useEffect(() => {
@@ -50,8 +53,18 @@ function CoachingPageContent() {
     }
   };
 
+  const handleTurnComplete = async (turn: { userText: string; coachResponse: string; score: Score }) => {
+    setScore(turn.score);
+    if (!sessionId.current || !user) return;
+    await updateDoc(doc(db, 'sessions', sessionId.current), {
+      messages: [...conversation, { role: 'user', content: turn.userText }, { role: 'assistant', content: turn.coachResponse }],
+      score: turn.score, scenario, updatedAt: new Date().toISOString(),
+    }).catch(console.error);
+  };
+
   const handleEndSession = async () => {
     if (confirm('End your coaching session?')) {
+      if (sessionId.current) await updateDoc(doc(db, 'sessions', sessionId.current), { status: 'completed', endedAt: new Date().toISOString() }).catch(console.error);
       router.push('/');
     }
   };
@@ -87,6 +100,9 @@ function CoachingPageContent() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="hidden sm:block bg-slate-700 text-white rounded px-2 py-1.5 text-sm">
+              {Object.entries(SCENARIOS).map(([value, details]) => <option key={value} value={value}>{details.label}</option>)}
+            </select>
             <button
               onClick={handleEndSession}
               className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
@@ -104,7 +120,7 @@ function CoachingPageContent() {
 
         {/* Voice Chat Component */}
         <div className="flex-1 flex flex-col min-h-0">
-          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} />
+          <VoiceChat onTranscriptUpdate={handleTranscriptUpdate} onTurnComplete={handleTurnComplete} scenario={scenario} />
         </div>
       </div>
 
@@ -114,7 +130,7 @@ function CoachingPageContent() {
           <div className="p-4 border-b border-slate-700">
             <h2 className="text-lg font-semibold text-white">Conversation</h2>
             <p className="text-xs text-slate-400 mt-1">
-              Session #{userProfile?.totalSessions || 1} • {conversation.length} messages
+              Session #{userProfile?.totalSessions || 1} • {conversation.length} messages • Score {score.total}/30
             </p>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">

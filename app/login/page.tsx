@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../lib/AuthContext';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,8 +23,8 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       router.push('/coaching');
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
       setLoading(false);
     }
@@ -91,7 +93,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
             <p className="text-slate-400 text-sm">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link
                 href="/signup"
                 className="text-emerald-500 hover:text-emerald-400 font-medium"
@@ -100,6 +102,9 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
+          <button type="button" onClick={() => email ? sendPasswordResetEmail(auth, email).then(() => setError('Password reset email sent.')).catch(() => setError('Could not send reset email.')) : setError('Enter your email first.')} className="w-full mt-4 text-sm text-slate-400 hover:text-white">
+            Forgot password?
+          </button>
         </div>
 
         <div className="mt-6 text-center">

@@ -25,10 +25,10 @@ export default function Home() {
             Riggleman Sales Coach
           </h1>
           <p className="text-xl text-slate-300 mb-2">
-            Master Phone Sales with Curtis Riggleman's "Dial For Dollars"
+            Master Phone Sales with Curtis Riggleman&apos;s &quot;Dial For Dollars&quot;
           </p>
           <p className="text-sm text-slate-400">
-            AI-powered coaching that brings Curtis's proven psychology-driven techniques to life
+            AI-powered coaching that brings Curtis&apos;s proven psychology-driven techniques to life
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export default function Home() {
             <div className="text-emerald-500 text-2xl mb-3">⏱️</div>
             <h3 className="text-lg font-semibold mb-2 text-white">The 7-Second Rule</h3>
             <p className="text-slate-400 text-sm">
-              Master Curtis's technique to hook customers in 7 seconds or lose them forever
+              Master Curtis&apos;s technique to hook customers in 7 seconds or lose them forever
             </p>
           </div>
 
@@ -90,7 +90,7 @@ export default function Home() {
             <div className="text-emerald-500 text-2xl mb-3">📞</div>
             <h3 className="text-lg font-semibold mb-2 text-white">Appointment Setting</h3>
             <p className="text-slate-400 text-sm">
-              Stop negotiating on the phone. Get them in the door with Curtis's proven tactics
+              Stop negotiating on the phone. Get them in the door with Curtis&apos;s proven tactics
             </p>
           </div>
 
@@ -98,7 +98,7 @@ export default function Home() {
             <div className="text-emerald-500 text-2xl mb-3">💪</div>
             <h3 className="text-lg font-semibold mb-2 text-white">Direct Coaching</h3>
             <p className="text-slate-400 text-sm">
-              No-nonsense feedback and exact scripts from Curtis's decades of automotive sales
+              No-nonsense feedback and exact scripts from Curtis&apos;s decades of automotive sales
             </p>
           </div>
         </div>

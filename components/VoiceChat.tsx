@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import type { Scenario, Score } from '@/lib/coaching';
 
 type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -9,11 +11,13 @@ type ConversationMessage = {
 
 interface VoiceChatProps {
   onTranscriptUpdate: (message: ConversationMessage) => void;
+  onTurnComplete?: (turn: { userText: string; coachResponse: string; score: Score }) => void;
+  scenario: Scenario;
 }
 
 type ProcessingStage = 'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
 
-export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
+export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario }: VoiceChatProps) {
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
@@ -22,6 +26,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { user } = useAuth();
 
   // 44-byte zero-length WAV — used once, synchronously in a user-gesture
   // handler, to unlock the Audio element on iOS Safari so later programmatic
@@ -51,9 +56,9 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         },
       });
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm',
-      });
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+        .find((type) => MediaRecorder.isTypeSupported(type));
+      const mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
       audioChunksRef.current = [];
 
@@ -64,7 +69,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || mimeType || 'audio/webm' });
         
         stream.getTracks().forEach((track) => track.stop());
         await processAudio(audioBlob);
@@ -84,16 +89,6 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       primeAudio();
       mediaRecorderRef.current.stop();
       setProcessingStage('transcribing');
-    }
-  };
-
-  const decodeHeader = (value: string | null): string => {
-    if (!value) return '';
-    try {
-      const bytes = Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
-      return new TextDecoder().decode(bytes);
-    } catch {
-      return '';
     }
   };
 
@@ -125,107 +120,29 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
     }
   };
 
-  const playStreamingAudio = async (stream: ReadableStream<Uint8Array>) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const win = window as unknown as {
-      ManagedMediaSource?: typeof MediaSource;
-      MediaSource?: typeof MediaSource;
-    };
-    const MSCtor = win.ManagedMediaSource ?? win.MediaSource;
-
-    if (
-      !MSCtor ||
-      typeof MSCtor.isTypeSupported !== 'function' ||
-      !MSCtor.isTypeSupported('audio/mpeg')
-    ) {
-      await playBufferedAudio(stream);
-      return;
-    }
-
-    if ('disableRemotePlayback' in audio) {
-      (audio as HTMLAudioElement & { disableRemotePlayback: boolean }).disableRemotePlayback = true;
-    }
-
-    const mediaSource = new MSCtor();
-    const objectUrl = URL.createObjectURL(mediaSource);
-    audio.src = objectUrl;
-
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const onEnded = () => resolve();
-        const onError = () => {
-          console.error('[VoiceChat] Audio element error:', audio.error);
-          resolve();
-        };
-        audio.addEventListener('ended', onEnded, { once: true });
-        audio.addEventListener('error', onError, { once: true });
-
-        mediaSource.addEventListener(
-          'sourceopen',
-          async () => {
-            try {
-              const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-              const reader = stream.getReader();
-              let started = false;
-
-              const waitForIdle = () =>
-                new Promise<void>((r) => {
-                  if (!sourceBuffer.updating) r();
-                  else
-                    sourceBuffer.addEventListener('updateend', () => r(), {
-                      once: true,
-                    });
-                });
-
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                await waitForIdle();
-                const chunk = new ArrayBuffer(value.byteLength);
-                new Uint8Array(chunk).set(value);
-                sourceBuffer.appendBuffer(chunk);
-                if (!started) {
-                  started = true;
-                  audio.play().catch((err) => {
-                    console.error('[VoiceChat] Audio play() failed:', err);
-                  });
-                }
-              }
-              await waitForIdle();
-              try {
-                mediaSource.endOfStream();
-              } catch {
-                /* already closed */
-              }
-            } catch (err) {
-              reject(err);
-            }
-          },
-          { once: true }
-        );
-      });
-    } finally {
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
-
   const processAudio = async (audioBlob: Blob) => {
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Could not read the recording'));
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(audioBlob);
+      });
         setProcessingStage('thinking');
+        const token = await user?.getIdToken();
+        if (!token) throw new Error('Your session expired. Please sign in again.');
 
         const response = await fetch('/api/simple-coach', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             audio: base64Audio,
+            audioType: audioBlob.type,
             conversation,
+            scenario,
           }),
         });
 
@@ -238,10 +155,8 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
           );
         }
 
-        const userText = decodeHeader(response.headers.get('x-user-text'));
-        const coachResponse = decodeHeader(
-          response.headers.get('x-coach-response')
-        );
+        const result = await response.json() as { userText: string; coachResponse: string; audio: string; score: Score };
+        const { userText, coachResponse, score } = result;
 
         setConversation((prev) => [
           ...prev,
@@ -251,15 +166,15 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         setLastUserText(userText);
         onTranscriptUpdate({ role: 'user', content: userText });
         onTranscriptUpdate({ role: 'assistant', content: coachResponse });
+        onTurnComplete?.({ userText, coachResponse, score });
 
-        if (response.body) {
+        if (result.audio) {
           setProcessingStage('speaking');
-          await playStreamingAudio(response.body);
+          const bytes = Uint8Array.from(atob(result.audio), (char) => char.charCodeAt(0));
+          await playBufferedAudio(new Response(bytes).body!);
         }
 
         setProcessingStage('idle');
-      };
-      reader.readAsDataURL(audioBlob);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Processing failed';
       setError(errorMsg);

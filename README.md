@@ -2,6 +2,12 @@
 
 An AI-powered voice coaching application that brings Curtis Riggleman's "Dial For Dollars" methodology to life. Have natural conversations with Curtis himself (AI-powered) to master phone sales, appointment setting, and objection handling using his proven psychology-driven techniques.
 
+## Production configuration
+
+The browser uses the `NEXT_PUBLIC_FIREBASE_*` values. The coaching API also verifies Firebase ID tokens server-side, so production must provide Firebase Admin credentials using either `FIREBASE_SERVICE_ACCOUNT_JSON` or `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` (see `.env.local.example`). Never expose Admin values with a `NEXT_PUBLIC_` prefix.
+
+The API limits each authenticated user to 12 coaching requests per minute and 8 MB per recording. Sessions are stored in the Firestore `sessions` collection; configure rules so a signed-in user can access only documents where `userId == request.auth.uid`.
+
 ## Features
 
 - 🎤 **Voice-First Interface**: Natural conversations with AI coach via microphone
