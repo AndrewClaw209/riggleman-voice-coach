@@ -8,6 +8,11 @@ export type LeaderboardEntry = {
   sessions: number;
   bestScenario: Scenario;
   bestAt: string;
+  bestScorecard: {
+    score: Score;
+    scenario: Scenario;
+    endedAt: string;
+  };
   updatedAt: string;
 };
 
@@ -37,6 +42,11 @@ export function buildLeaderboardEntry(
     sessions: sessions.length,
     bestScenario: best.scenario,
     bestAt: best.endedAt || now,
+    bestScorecard: {
+      score: best.score,
+      scenario: best.scenario,
+      endedAt: best.endedAt || now,
+    },
     updatedAt: now,
   };
 }
