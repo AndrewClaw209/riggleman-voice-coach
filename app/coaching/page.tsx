@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import VoiceChat from '@/components/VoiceChat';
-import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -118,13 +117,6 @@ function CoachingPageContent() {
         {/* Compact header */}
         <header className="shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b border-slate-800 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/"
-              className="text-emerald-400 hover:text-emerald-300 text-sm shrink-0"
-              aria-label="Back to home"
-            >
-              ←
-            </Link>
             <div className="min-w-0">
               <h1 className="text-base sm:text-xl font-semibold text-white leading-tight truncate">
                 Coaching Session
