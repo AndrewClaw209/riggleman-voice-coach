@@ -108,7 +108,7 @@ function CoachingPageContent() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Compact header */}
-        <header className="shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b border-slate-800 flex items-center justify-between gap-3">
+        <header className="shrink-0 px-4 sm:px-6 pt-3 pb-3 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0">
               <h1 className="text-base sm:text-xl font-semibold text-white leading-tight truncate">
@@ -120,16 +120,26 @@ function CoachingPageContent() {
       </div>
 
       {showScorecardModal && scorecard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="scorecard-title">
-          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-emerald-700/60 bg-slate-800 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="scorecard-title">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#c58b2a]/70 bg-slate-800 p-4 sm:max-h-[90dvh] sm:p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wider text-emerald-400">Session complete</p>
-                <h2 id="scorecard-title" className="mt-1 text-2xl font-bold text-white">Your Scorecard</h2>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#f2cd7f]">Session complete</p>
+                <h2 id="scorecard-title" className="mt-1 text-xl font-bold text-white sm:text-2xl">Your Scorecard</h2>
               </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-white">{score.total}<span className="text-lg text-slate-400">/30</span></p>
-                <p className="text-xs text-slate-400">Overall score</p>
+              <div className="flex items-start gap-3">
+                <div className="text-right">
+                  <p className="text-3xl font-bold text-white">{score.total}<span className="text-lg text-slate-400">/30</span></p>
+                  <p className="text-xs text-slate-400">Overall score</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowScorecardModal(false)}
+                  className="-mr-1 -mt-1 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+                  aria-label="Close scorecard"
+                >
+                  <span aria-hidden="true" className="text-2xl leading-none">×</span>
+                </button>
               </div>
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-200">{scorecard.summary}</p>
@@ -160,7 +170,7 @@ function CoachingPageContent() {
             <button
               type="button"
               onClick={() => setShowScorecardModal(false)}
-              className="mt-6 w-full rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-500"
+              className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#f2cd7f] to-[#c58b2a] px-4 py-3 font-semibold text-[#17120a] shadow-[0_6px_18px_rgba(226,167,63,0.25)] transition-colors hover:from-[#f7d995] hover:to-[#e2a73f]"
             >
               Close scorecard
             </button>
@@ -168,16 +178,16 @@ function CoachingPageContent() {
         </div>
       )}
     </div>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
-              <span>Pick a scenario for better context</span>
-              <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="bg-slate-700 text-white rounded px-2 py-1.5 text-sm">
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
+            <label className="flex min-w-0 flex-1 flex-col items-start gap-1 text-xs font-medium text-slate-400 sm:flex-none sm:flex-row sm:items-center sm:gap-2">
+              <span className="shrink-0">Pick a scenario for better context</span>
+              <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="w-full min-w-0 rounded bg-slate-700 px-2 py-2 text-sm text-white sm:w-auto">
                 {Object.entries(SCENARIOS).map(([value, details]) => <option key={value} value={value}>{details.label}</option>)}
               </select>
             </label>
             <button
               onClick={handleSignOut}
-              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+              className="shrink-0 px-2 py-2 text-sm text-slate-400 transition-colors hover:text-white"
             >
               Sign Out
             </button>
@@ -187,13 +197,23 @@ function CoachingPageContent() {
         {/* Voice Chat Component */}
         <div className="flex-1 flex flex-col min-h-0">
           {scorecard && (
-            <div className="shrink-0 mx-4 mt-3 rounded-xl border border-emerald-700/60 bg-slate-800 p-4 shadow-lg lg:hidden">
+            <div className="mx-3 mt-3 shrink-0 rounded-xl border border-[#c58b2a]/70 bg-slate-800 p-4 shadow-lg sm:mx-4 lg:hidden">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-emerald-300">Session Scorecard</h2>
+                  <h2 className="text-base font-semibold text-[#f2cd7f]">Session Scorecard</h2>
                   <p className="text-sm text-slate-200 mt-1">{scorecard.summary}</p>
                 </div>
-                <span className="text-xl font-bold text-white shrink-0">{score.total}/30</span>
+                <div className="flex shrink-0 items-start gap-2">
+                  <span className="text-xl font-bold text-white">{score.total}/30</span>
+                  <button
+                    type="button"
+                    onClick={() => setScorecard(null)}
+                    className="-mr-2 -mt-2 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+                    aria-label="Close scorecard"
+                  >
+                    <span aria-hidden="true" className="text-xl leading-none">×</span>
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-3">
                 {Object.entries(score).filter(([key]) => key !== 'total').map(([key, value]) => (
