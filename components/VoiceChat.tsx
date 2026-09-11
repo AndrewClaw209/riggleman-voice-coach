@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
 import type { Scenario, Score } from '@/lib/coaching';
 
@@ -477,6 +478,16 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
                 Tap the button below and speak naturally. The AI will listen,
                 understand, and give you instant feedback.
               </p>
+              <div className="relative mx-auto mt-5 h-32 w-56 overflow-hidden rounded-2xl border border-[#c58b2a]/30 bg-black shadow-[0_8px_24px_rgba(197,139,42,0.12)]">
+                <Image
+                  src="/curtis-ai-logo.png"
+                  alt="Curtis Riggleman AI"
+                  fill
+                  sizes="224px"
+                  className="object-contain"
+                  priority
+                />
+              </div>
             </div>
           )}
 
