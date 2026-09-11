@@ -32,6 +32,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
   const liveChannelRef = useRef<RTCDataChannel | null>(null);
   const liveStreamRef = useRef<MediaStream | null>(null);
   const liveTranscriptRef = useRef<ConversationMessage[]>([]);
+  const livePartialTranscriptRef = useRef<{ user: string; assistant: string }>({ user: '', assistant: '' });
   const { user } = useAuth();
   const liveEnabled = process.env.NEXT_PUBLIC_ENABLE_LIVE_COACHING === 'true';
   const [useLive, setUseLive] = useState(liveEnabled);
@@ -103,24 +104,41 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
   const handleLiveEvent = (event: MessageEvent) => {
     try {
       const payload = JSON.parse(event.data as string) as { type?: string; transcript?: string; delta?: string };
-      const text = payload.transcript?.trim();
+      const type = payload.type || '';
+      const isUser = type === 'conversation.item.input_audio_transcription.delta' ||
+        type === 'conversation.item.input_audio_transcription.completed';
+      const isUserDelta = type === 'conversation.item.input_audio_transcription.delta';
+      const isAssistantDelta = type === 'response.audio_transcript.delta' ||
+        type === 'response.output_audio_transcript.delta' ||
+        type === 'response.text.delta';
+      const isAssistantFinal = type === 'response.audio_transcript.done' ||
+        type === 'response.output_audio_transcript.done' ||
+        type === 'response.text.done';
+
+      if (!isUser && !isAssistantDelta && !isAssistantFinal) return;
+
+      const role = isUser ? 'user' : 'assistant';
+      const partial = livePartialTranscriptRef.current[role];
+      const incoming = (payload.delta || '').trim();
+      const finalized = (payload.transcript || '').trim();
+
+      if (isUserDelta || isAssistantDelta) {
+        if (!incoming) return;
+        livePartialTranscriptRef.current[role] = `${partial}${partial && !/\s$/.test(partial) ? ' ' : ''}${incoming}`;
+        return;
+      }
+
+      // Final events may contain the complete transcript, or may only signal
+      // completion after a sequence of delta events. Prefer the complete text
+      // and fall back to the accumulated partial transcript.
+      const text = finalized || livePartialTranscriptRef.current[role].trim();
+      livePartialTranscriptRef.current[role] = '';
       if (!text) return;
 
-      // Live emits finalized transcript events for both sides. Keeping these
-      // events in the same transcript callback makes Firestore persistence and
-      // the existing conversation UI work for both transport modes.
-      if (payload.type === 'conversation.item.input_audio_transcription.completed') {
-        setLastUserText(text);
-        liveTranscriptRef.current.push({ role: 'user', content: text });
-        onTranscriptUpdate({ role: 'user', content: text });
-      } else if (
-        payload.type === 'response.audio_transcript.done' ||
-        payload.type === 'response.output_audio_transcript.done' ||
-        payload.type === 'response.text.done'
-      ) {
-        liveTranscriptRef.current.push({ role: 'assistant', content: text });
-        onTranscriptUpdate({ role: 'assistant', content: text });
-      }
+      const message: ConversationMessage = { role, content: text };
+      liveTranscriptRef.current.push(message);
+      onTranscriptUpdate(message);
+      if (role === 'user') setLastUserText(text);
     } catch {
       // Ignore non-JSON browser events; the audio connection can continue.
     }
@@ -130,6 +148,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
     let stream: MediaStream | null = null;
     try {
       liveTranscriptRef.current = [];
+      livePartialTranscriptRef.current = { user: '', assistant: '' };
       setError(null);
       setProcessingStage('connecting');
       primeAudio();
@@ -187,6 +206,18 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
   const finalizeLiveSession = () => {
     setShowEndConfirmation(false);
     const transcript = liveTranscriptRef.current;
+
+    // A user can end the call between a transcript delta and its finalized
+    // event. Preserve that speech so a short final turn can still be scored.
+    for (const role of ['user', 'assistant'] as const) {
+      const pending = livePartialTranscriptRef.current[role].trim();
+      if (pending) {
+        const message: ConversationMessage = { role, content: pending };
+        transcript.push(message);
+        onTranscriptUpdate(message);
+      }
+    }
+    livePartialTranscriptRef.current = { user: '', assistant: '' };
     liveChannelRef.current?.close();
     livePeerRef.current?.close();
     liveStreamRef.current?.getTracks().forEach((track) => track.stop());
