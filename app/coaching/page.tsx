@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
 import { addDoc, collection, doc, getDocs, increment, query, setDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
+import { SCORE_DIMENSIONS, SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
 import { buildLeaderboardEntry } from '@/lib/leaderboard';
 
 interface ConversationMessage {
@@ -35,6 +35,7 @@ const formatScorecardDate = (value?: string) => value
   : 'Recent session';
 
 const scenarioLabel = (value: Scenario) => SCENARIOS[value]?.label || 'Coaching session';
+const scoreDimensionLabel = (value: string) => value.replace(/([A-Z])/g, ' $1');
 
 function CoachingPageContent() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
@@ -45,6 +46,7 @@ function CoachingPageContent() {
   const [showScorecardModal, setShowScorecardModal] = useState(false);
   const [recentScorecards, setRecentScorecards] = useState<RecentScorecard[]>([]);
   const [activeScorecardIndex, setActiveScorecardIndex] = useState(0);
+  const [expandedScorecardId, setExpandedScorecardId] = useState<string | null>(null);
   const [selectedRecentScorecard, setSelectedRecentScorecard] = useState<RecentScorecard | null>(null);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const sessionId = useRef<string | null>(null);
@@ -185,6 +187,7 @@ function CoachingPageContent() {
 
   const rotateScorecards = (direction: 1 | -1) => {
     if (recentScorecards.length < 2) return;
+    setExpandedScorecardId(null);
     setActiveScorecardIndex((current) => (current + direction + recentScorecards.length) % recentScorecards.length);
   };
 
@@ -374,7 +377,7 @@ function CoachingPageContent() {
               <p className="mt-2 text-sm text-slate-400">Drag the cards to revisit your latest sessions.</p>
               {recentScorecards.length > 0 ? (
                 <div
-                  className="relative mt-5 h-[390px] touch-pan-y"
+                  className={`relative mt-5 touch-pan-y transition-[height] duration-300 ${expandedScorecardId ? 'h-[570px]' : 'h-[390px]'}`}
                   onPointerDown={(event) => { deckDragStart.current = event.clientX; event.currentTarget.setPointerCapture(event.pointerId); }}
                   onPointerUp={(event) => {
                     if (deckDragStart.current === null) return;
@@ -385,20 +388,47 @@ function CoachingPageContent() {
                 >
                   {recentScorecards.map((item, offset) => {
                     const position = (offset - activeScorecardIndex + recentScorecards.length) % recentScorecards.length;
+                    const isExpanded = position === 0 && expandedScorecardId === item.id;
                     return <button
                       key={item.id}
                       type="button"
-                      onClick={() => position === 0 ? openRecentScorecard(item) : rotateScorecards(position === 1 ? 1 : -1)}
-                      className="absolute inset-x-0 top-0 flex h-[350px] cursor-grab flex-col rounded-2xl border border-[#c58b2a]/70 bg-gradient-to-br from-slate-700 to-slate-900 p-5 text-left shadow-2xl transition-all duration-300 active:cursor-grabbing"
-                      style={{ zIndex: recentScorecards.length - position, transform: `translateY(${position * 18}px) scale(${1 - position * 0.045})`, opacity: position === 0 ? 1 : 0.72 }}
+                      onClick={() => {
+                        if (position !== 0) {
+                          rotateScorecards(position === 1 ? 1 : -1);
+                        } else if (isExpanded) {
+                          openRecentScorecard(item);
+                        } else {
+                          setExpandedScorecardId(item.id);
+                        }
+                      }}
+                      className={`absolute inset-x-0 top-0 flex cursor-grab flex-col rounded-2xl border text-left shadow-2xl transition-all duration-300 active:cursor-grabbing ${isExpanded ? 'h-[550px] border-[#f2cd7f] bg-gradient-to-br from-slate-700 via-slate-800 to-slate-950 p-5 shadow-[0_18px_45px_rgba(197,139,42,0.28)]' : 'h-[350px] border-[#c58b2a]/70 bg-gradient-to-br from-slate-700 to-slate-900 p-5'}`}
+                      style={{ zIndex: isExpanded ? recentScorecards.length + 1 : recentScorecards.length - position, transform: isExpanded ? 'translateY(-14px) scale(1.025)' : `translateY(${position * 18}px) scale(${1 - position * 0.045})`, opacity: position === 0 ? 1 : 0.72 }}
                       aria-label={`${scenarioLabel(item.scenario)} scorecard`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div><p className="text-xs font-semibold uppercase tracking-wider text-[#f2cd7f]">{formatScorecardDate(item.endedAt)}</p><h3 className="mt-2 text-lg font-bold text-white">{scenarioLabel(item.scenario)}</h3></div>
                         <span className="text-3xl font-bold text-[#f2cd7f]">{item.score.total}<span className="text-sm font-normal text-slate-400">/30</span></span>
                       </div>
-                      <p className="mt-5 line-clamp-4 text-sm leading-6 text-slate-300">{item.scorecard.summary}</p>
-                      <div className="mt-auto border-t border-slate-600 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Next focus</p><p className="mt-2 line-clamp-2 text-sm text-amber-100">{item.scorecard.improvements[0] || 'Keep building consistency.'}</p></div>
+                      <p className={`${isExpanded ? 'mt-4' : 'mt-5'} ${isExpanded ? '' : 'line-clamp-4'} text-sm leading-6 text-slate-300`}>{item.scorecard.summary}</p>
+                      {isExpanded ? (
+                        <>
+                          <div className="mt-4 grid grid-cols-2 gap-2">
+                            {SCORE_DIMENSIONS.map((dimension) => (
+                              <div key={dimension} className="rounded-lg border border-slate-600/80 bg-slate-900/50 px-3 py-2">
+                                <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">{scoreDimensionLabel(dimension)}</p>
+                                <p className="mt-1 text-lg font-bold text-white">{item.score[dimension]}<span className="text-xs font-normal text-slate-500">/5</span></p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 grid gap-3 border-t border-slate-600 pt-4 text-xs leading-5">
+                            <div><p className="font-semibold uppercase tracking-wider text-emerald-300">Strengths</p><p className="mt-1 text-emerald-100">{item.scorecard.strengths.join(' • ') || 'Keep building consistency.'}</p></div>
+                            <div><p className="font-semibold uppercase tracking-wider text-amber-300">Next focus</p><p className="mt-1 text-amber-100">{item.scorecard.improvements.join(' • ') || 'Keep building consistency.'}</p></div>
+                          </div>
+                          <p className="mt-auto text-center text-xs font-semibold text-[#f2cd7f]">Click again to view the full transcript</p>
+                        </>
+                      ) : (
+                        <div className="mt-auto border-t border-slate-600 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Next focus</p><p className="mt-2 line-clamp-2 text-sm text-amber-100">{item.scorecard.improvements[0] || 'Keep building consistency.'}</p><p className="mt-3 text-xs font-semibold text-[#f2cd7f]">Click to expand</p></div>
+                      )}
                     </button>;
                   })}
                 </div>
