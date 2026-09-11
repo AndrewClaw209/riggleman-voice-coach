@@ -40,6 +40,7 @@ function validConversation(value: unknown): ConversationMessage[] {
 }
 
 export async function POST(request: NextRequest) {
+  let stage = 'request validation';
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) return unauthorized();
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
     const openai = new OpenAI({ apiKey });
     const audioType = typeof body.audioType === 'string' && /^(audio\/(webm|mp4|ogg|mpeg|wav))/.test(body.audioType) ? body.audioType : 'audio/webm';
     const extension = audioType.includes('mp4') ? 'mp4' : audioType.includes('ogg') ? 'ogg' : audioType.includes('wav') ? 'wav' : audioType.includes('mpeg') ? 'mp3' : 'webm';
+    stage = 'audio transcription';
     const transcription = await openai.audio.transcriptions.create({ file: new File([audioBuffer], `audio.${extension}`, { type: audioType }), model: 'whisper-1' });
     const userText = transcription.text.trim().slice(0, MAX_MESSAGE_CHARS);
     if (!userText) return NextResponse.json({ error: 'No speech detected' }, { status: 422 });
@@ -69,8 +71,10 @@ export async function POST(request: NextRequest) {
       ...conversation,
       { role: 'user' as const, content: userText },
     ];
+    stage = 'coach response';
     const completion = await openai.chat.completions.create({ model: 'gpt-4o', messages, temperature: 0.7, max_tokens: 600 });
     const coachResponse = completion.choices[0]?.message.content?.trim() || 'Tell me more.';
+    stage = 'response scoring';
     const scoreCompletion = await openai.chat.completions.create({
       model: 'gpt-4o-mini', temperature: 0, max_tokens: 180,
       response_format: { type: 'json_object' },
@@ -80,12 +84,17 @@ export async function POST(request: NextRequest) {
     try { score = JSON.parse(scoreCompletion.choices[0]?.message.content || '{}'); } catch { /* keep empty */ }
     const normalizedScore = Object.fromEntries(SCORE_DIMENSIONS.map((key) => [key, Math.max(0, Math.min(5, Math.round(Number(score[key]) || 0)))]));
     const total = Object.values(normalizedScore).reduce((sum, value) => sum + value, 0);
+    stage = 'voice response';
     const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'tts-1', voice: 'onyx', input: coachResponse, response_format: 'mp3' }) });
-    if (!ttsResponse.ok) return NextResponse.json({ error: 'TTS request failed' }, { status: 502 });
+    if (!ttsResponse.ok) {
+      console.error('TTS request failed:', ttsResponse.status, await ttsResponse.text());
+      return NextResponse.json({ error: 'Voice response failed', stage }, { status: 502 });
+    }
     const audio = Buffer.from(await ttsResponse.arrayBuffer()).toString('base64');
     return NextResponse.json({ userText, coachResponse, audio, score: { ...normalizedScore, total }, scenario });
   } catch (error) {
-    console.error('Error in coach API:', error);
-    return NextResponse.json({ error: 'Failed to process coaching request' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : 'Unknown server error';
+    console.error(`Error in coach API during ${stage}:`, error);
+    return NextResponse.json({ error: 'Failed to process coaching request', stage, detail }, { status: 500 });
   }
 }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
-import { addDoc, collection, doc, updateDoc, increment } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SCENARIOS, emptyScore, type Scenario, type Score } from '@/lib/coaching';
 
@@ -30,7 +30,20 @@ function CoachingPageContent() {
       userId: user.uid, scenario, status: 'active', messages: [], score: emptyScore(),
       startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     }).then((ref) => { sessionId.current = ref.id; }).catch(console.error);
-    updateDoc(doc(db, 'users', user.uid), { totalSessions: increment(1), lastActive: new Date().toISOString() }).catch(console.error);
+    // A user may have authenticated before their profile was written (or may
+    // be an account created before profiles were introduced). `updateDoc`
+    // fails when the document does not exist; merge writes create it safely.
+    setDoc(doc(db, 'users', user.uid), {
+      uid: user.uid,
+      email: user.email || '',
+      displayName: user.displayName || 'Sales Rep',
+      role: 'sales_rep',
+      dealership: '',
+      totalSessions: increment(1),
+      totalMessages: 0,
+      createdAt: new Date().toISOString(),
+      lastActive: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
   }, [user, scenario]);
 
   // Check screen size - hide sidebar on mobile
@@ -46,10 +59,10 @@ function CoachingPageContent() {
     
     // Track message count
     if (user && message.role === 'user') {
-      updateDoc(doc(db, 'users', user.uid), {
+      setDoc(doc(db, 'users', user.uid), {
         totalMessages: increment(1),
         lastActive: new Date().toISOString(),
-      }).catch(console.error);
+      }, { merge: true }).catch(console.error);
     }
   };
 
