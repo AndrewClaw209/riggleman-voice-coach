@@ -51,9 +51,9 @@ export default function SignupPage() {
           <Image
             src="/curtis-ai-logo.png"
             alt="Curtis Riggleman AI"
-            width={320}
-            height={320}
-            className="mx-auto my-0 p-0 h-80 w-80 object-contain"
+            width={892}
+            height={266}
+            className="mx-auto my-0 h-auto w-full max-w-[28rem] object-contain"
           />
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-400 mb-3">
             Welcome to Curtis AI

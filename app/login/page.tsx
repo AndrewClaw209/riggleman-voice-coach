@@ -53,9 +53,9 @@ export default function LoginPage() {
           <Image
             src="/curtis-ai-logo.png"
             alt="Curtis Riggleman AI"
-            width={320}
-            height={320}
-            className="mx-auto my-0 p-0 h-80 w-80 object-contain"
+            width={892}
+            height={266}
+            className="mx-auto my-0 h-auto w-full max-w-[28rem] object-contain"
           />
           <h1 className="text-4xl font-bold mb-2">Welcome Back</h1>
           <p className="text-slate-400">Sign in to continue your coaching</p>
