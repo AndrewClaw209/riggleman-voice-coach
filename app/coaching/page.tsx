@@ -165,7 +165,7 @@ function CoachingPageContent() {
         totalSessions: increment(1),
         lastActive: endedAt,
       }, { merge: true });
-      if (user && userProfile?.leaderboardOptIn) {
+      if (user) {
         const snapshot = await getDocs(query(collection(db, 'sessions'), where('userId', '==', user.uid)));
         const completed = snapshot.docs.map((item) => item.data())
           .filter((item) => item.status === 'completed' && item.scorecard && item.score && typeof item.score.total === 'number')
