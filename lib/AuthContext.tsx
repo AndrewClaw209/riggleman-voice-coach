@@ -52,9 +52,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(user);
       if (user) {
         // Load user profile from Firestore
-        const profileDoc = await getDoc(doc(db, 'users', user.uid));
-        if (profileDoc.exists()) {
-          setUserProfile(profileDoc.data() as UserProfile);
+        try {
+          const profileDoc = await getDoc(doc(db, 'users', user.uid));
+          if (profileDoc.exists()) setUserProfile(profileDoc.data() as UserProfile);
+        } catch (error) {
+          console.error('Could not load user profile:', error);
+          setUserProfile(null);
         }
       } else {
         setUserProfile(null);

@@ -150,8 +150,13 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, scenario
           const errorData = await response
             .json()
             .catch(() => ({ error: 'Failed to get coaching response' }));
+          const detail = [errorData.stage, errorData.detail]
+            .filter((value): value is string => typeof value === 'string' && value.length > 0)
+            .join(': ');
           throw new Error(
-            errorData.error || 'Failed to get coaching response'
+            [errorData.error || 'Failed to get coaching response', detail]
+              .filter(Boolean)
+              .join(' — ')
           );
         }
 
