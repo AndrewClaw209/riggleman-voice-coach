@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '../../lib/AuthContext';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
@@ -15,6 +16,14 @@ export default function LoginPage() {
   const router = useRouter();
   const { signIn } = useAuth();
 
+  useEffect(() => {
+    const hasVisitedAuth = window.localStorage.getItem('curtis-auth-visited');
+    if (!hasVisitedAuth) {
+      window.localStorage.setItem('curtis-auth-visited', 'true');
+      router.replace('/signup?welcome=1');
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -24,6 +33,13 @@ export default function LoginPage() {
       await signIn(email, password);
       router.push('/coaching');
     } catch (err: unknown) {
+      const firebaseCode = typeof err === 'object' && err !== null && 'code' in err
+        ? String((err as { code?: unknown }).code)
+        : '';
+      if (firebaseCode === 'auth/user-not-found') {
+        router.push(`/signup?email=${encodeURIComponent(email)}&welcome=1`);
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
       setLoading(false);
@@ -34,6 +50,13 @@ export default function LoginPage() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
       <div className="max-w-md w-full mx-auto px-6">
         <div className="text-center mb-8">
+          <Image
+            src="/curtis-ai-logo.png"
+            alt="Curtis Riggleman AI"
+            width={160}
+            height={160}
+            className="mx-auto mb-6 h-40 w-40 object-contain"
+          />
           <h1 className="text-4xl font-bold mb-2">Welcome Back</h1>
           <p className="text-slate-400">Sign in to continue your coaching</p>
         </div>

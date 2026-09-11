@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '../../lib/AuthContext';
 
 export default function SignupPage() {
@@ -14,6 +15,13 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { signUp } = useAuth();
+
+  useEffect(() => {
+    window.localStorage.setItem('curtis-auth-visited', 'true');
+    const params = new URLSearchParams(window.location.search);
+    const invitedEmail = params.get('email');
+    if (invitedEmail) setEmail(invitedEmail);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +48,21 @@ export default function SignupPage() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white py-12">
       <div className="max-w-md w-full mx-auto px-6">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Join the Team</h1>
-          <p className="text-slate-400">Start your Curtis Riggleman coaching journey</p>
+          <Image
+            src="/curtis-ai-logo.png"
+            alt="Curtis Riggleman AI"
+            width={160}
+            height={160}
+            className="mx-auto mb-6 h-40 w-40 object-contain"
+          />
+          <p className="text-sm uppercase tracking-[0.24em] text-emerald-400 mb-3">
+            Welcome to Curtis AI
+          </p>
+          <h1 className="text-4xl font-bold mb-3">Build confidence on every call</h1>
+          <p className="text-slate-400 leading-relaxed">
+            Create your free coaching account to practice realistic customer conversations,
+            sharpen your sales process, and get instant feedback after every session.
+          </p>
         </div>
 
         <div className="bg-slate-800 p-8 rounded-lg border border-slate-700">
@@ -131,7 +152,7 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full py-3 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white font-semibold rounded-lg transition-colors duration-200"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? 'Creating your account...' : 'Start Coaching Free'}
             </button>
           </form>
 
