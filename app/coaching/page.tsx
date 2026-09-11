@@ -27,6 +27,7 @@ function CoachingPageContent() {
   const [scenario, setScenario] = useState<Scenario>('inbound');
   const [score, setScore] = useState<Score>(emptyScore());
   const [scorecard, setScorecard] = useState<SessionScorecard | null>(null);
+  const [showScorecardModal, setShowScorecardModal] = useState(false);
   const sessionId = useRef<string | null>(null);
   const { user, userProfile, signOut } = useAuth();
   const router = useRouter();
@@ -85,10 +86,13 @@ function CoachingPageContent() {
   const handleSessionScored = async (result: { score: Score; summary: string; strengths: string[]; improvements: string[] }) => {
     setScore(result.score);
     setScorecard({ summary: result.summary, strengths: result.strengths, improvements: result.improvements });
+    setShowScorecardModal(true);
     if (!sessionId.current) return;
     await updateDoc(doc(db, 'sessions', sessionId.current), {
+      status: 'completed',
       score: result.score,
       scorecard: { summary: result.summary, strengths: result.strengths, improvements: result.improvements },
+      endedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }).catch(console.error);
   };
@@ -128,8 +132,57 @@ function CoachingPageContent() {
               <p className="text-slate-400 text-xs sm:text-sm leading-tight truncate">
                 {userProfile?.displayName} • {userProfile?.dealership}
               </p>
+      </div>
+
+      {showScorecardModal && scorecard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="scorecard-title">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-emerald-700/60 bg-slate-800 p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wider text-emerald-400">Session complete</p>
+                <h2 id="scorecard-title" className="mt-1 text-2xl font-bold text-white">Your Scorecard</h2>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-white">{score.total}<span className="text-lg text-slate-400">/30</span></p>
+                <p className="text-xs text-slate-400">Overall score</p>
+              </div>
             </div>
+            <p className="mt-4 text-sm leading-6 text-slate-200">{scorecard.summary}</p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {Object.entries(score).filter(([key]) => key !== 'total').map(([key, value]) => (
+                <div key={key} className="rounded-xl bg-slate-700/70 p-3">
+                  <p className="text-xs capitalize text-slate-400">{key.replace(/([A-Z])/g, ' $1')}</p>
+                  <p className="mt-1 text-xl font-bold text-white">{value}<span className="text-sm font-normal text-slate-400">/5</span></p>
+                </div>
+              ))}
+            </div>
+            {scorecard.strengths.length > 0 && (
+              <div className="mt-5">
+                <h3 className="font-semibold text-emerald-300">Strengths</h3>
+                <ul className="mt-2 space-y-1 text-sm text-emerald-100">
+                  {scorecard.strengths.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+            )}
+            {scorecard.improvements.length > 0 && (
+              <div className="mt-5">
+                <h3 className="font-semibold text-amber-300">Next focus</h3>
+                <ul className="mt-2 space-y-1 text-sm text-amber-100">
+                  {scorecard.improvements.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowScorecardModal(false)}
+              className="mt-6 w-full rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-500"
+            >
+              Close scorecard
+            </button>
           </div>
+        </div>
+      )}
+    </div>
           <div className="flex items-center gap-2">
             <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="hidden sm:block bg-slate-700 text-white rounded px-2 py-1.5 text-sm">
               {Object.entries(SCENARIOS).map(([value, details]) => <option key={value} value={value}>{details.label}</option>)}

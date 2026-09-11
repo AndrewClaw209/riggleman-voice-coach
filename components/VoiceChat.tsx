@@ -23,6 +23,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
   const [lastUserText, setLastUserText] = useState<string>('');
+  const [showEndConfirmation, setShowEndConfirmation] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -180,6 +181,11 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
   };
 
   const stopLiveSession = () => {
+    setShowEndConfirmation(true);
+  };
+
+  const finalizeLiveSession = () => {
+    setShowEndConfirmation(false);
     const transcript = liveTranscriptRef.current;
     liveChannelRef.current?.close();
     livePeerRef.current?.close();
@@ -191,6 +197,8 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
     setProcessingStage('idle');
     if (transcript.some((message) => message.role === 'user')) {
       void scoreLiveSession(transcript);
+    } else {
+      setError('No salesperson responses were captured, so there is nothing to score yet.');
     }
   };
 
@@ -489,6 +497,33 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
           </p>
         )}
       </div>
+
+      {showEndConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="end-live-title">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
+            <h2 id="end-live-title" className="text-xl font-bold text-white">Ready to end this session?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Choose Yes to end the live call and generate your scorecard, or No to continue practicing.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowEndConfirmation(false)}
+                className="rounded-xl border border-slate-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-slate-700"
+              >
+                No, continue
+              </button>
+              <button
+                type="button"
+                onClick={finalizeLiveSession}
+                className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-500"
+              >
+                Yes, end session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
