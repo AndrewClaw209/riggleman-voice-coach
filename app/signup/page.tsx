@@ -45,7 +45,7 @@ export default function SignupPage() {
   };
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white py-12">
+    <main className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
       <div className="max-w-md w-full mx-auto px-6">
         <div className="text-center mb-8">
           <Image
@@ -53,7 +53,7 @@ export default function SignupPage() {
             alt="Curtis Riggleman AI"
             width={320}
             height={320}
-            className="mx-auto mb-0 h-80 w-80 object-contain"
+            className="mx-auto my-0 p-0 h-80 w-80 object-contain"
           />
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-400 mb-3">
             Welcome to Curtis AI
