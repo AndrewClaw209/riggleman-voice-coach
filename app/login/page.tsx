@@ -55,7 +55,7 @@ export default function LoginPage() {
             alt="Curtis Riggleman AI"
             width={892}
             height={266}
-            className="mx-auto my-0 h-auto w-full max-w-[28rem] object-contain"
+            className="mx-auto mb-2 mt-0 h-auto w-full max-w-[28rem] object-contain"
           />
           <h1 className="text-4xl font-bold mb-2">Welcome Back</h1>
           <p className="text-slate-400">Sign in to continue your coaching</p>

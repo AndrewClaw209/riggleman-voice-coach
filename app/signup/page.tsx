@@ -53,7 +53,7 @@ export default function SignupPage() {
             alt="Curtis Riggleman AI"
             width={892}
             height={266}
-            className="mx-auto my-0 h-auto w-full max-w-[28rem] object-contain"
+            className="mx-auto my-0 h-auto w-full max-w-[28rem] object-contain py-2"
           />
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-400 mb-3">
             Welcome to Curtis AI
