@@ -412,17 +412,20 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
             hasConversation ? 'py-4' : 'py-8'
           }`}
         >
-          {/* Status badge (compact when a conversation is in progress) */}
-          <div
-            className={`${stage.color} rounded-full text-white font-semibold flex items-center gap-2 transition-all ${
-              hasConversation ? 'px-4 py-1.5 mb-4 text-sm' : 'px-6 py-3 mb-6 text-base'
-            }`}
-          >
-            <span className={hasConversation ? 'text-base' : 'text-2xl'}>
-              {stage.emoji}
-            </span>
-            <span>{stage.text}</span>
-          </div>
+          {/* Show live activity, errors, and processing states without a
+              persistent "Ready" badge taking up the center of the page. */}
+          {processingStage !== 'idle' && (
+            <div
+              className={`${stage.color} rounded-full text-white font-semibold flex items-center gap-2 transition-all ${
+                hasConversation ? 'px-4 py-1.5 mb-4 text-sm' : 'px-6 py-3 mb-6 text-base'
+              }`}
+            >
+              <span className={hasConversation ? 'text-base' : 'text-2xl'}>
+                {stage.emoji}
+              </span>
+              <span>{stage.text}</span>
+            </div>
+          )}
 
           {/* Large visual progress indicator — only before the first turn */}
           {isProcessing && !hasConversation && (
@@ -515,9 +518,9 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
           <button
             onClick={processingStage === 'live' ? stopLiveSession : startLiveSession}
             disabled={processingStage === 'connecting' || isProcessing && processingStage !== 'live'}
-            className={`w-full py-4 px-6 ${processingStage === 'live' ? 'bg-red-700 hover:bg-red-600' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600'} disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-50 text-white font-bold text-lg rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3`}
+            className={`w-full py-4 px-6 ${processingStage === 'live' ? 'bg-red-700 hover:bg-red-600' : 'bg-gradient-to-r from-[#f2cd7f] to-[#c58b2a] hover:from-[#f7d995] hover:to-[#e2a73f] text-[#17120a] shadow-[0_8px_24px_rgba(226,167,63,0.3)]'} disabled:from-slate-600 disabled:to-slate-600 disabled:opacity-50 font-bold text-lg rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3`}
           >
-            <span className="text-2xl">{processingStage === 'live' ? '⏹️' : '🟢'}</span>
+            {processingStage === 'live' && <span className="text-2xl">⏹️</span>}
             <span>{processingStage === 'live' ? 'End Live Coaching' : 'Start Live Coaching'}</span>
           </button>
         ) : !isRecording ? (

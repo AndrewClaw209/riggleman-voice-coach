@@ -96,13 +96,6 @@ function CoachingPageContent() {
     }).catch(console.error);
   };
 
-  const handleEndSession = async () => {
-    if (confirm('End your coaching session?')) {
-      if (sessionId.current) await updateDoc(doc(db, 'sessions', sessionId.current), { status: 'completed', endedAt: new Date().toISOString() }).catch(console.error);
-      router.push('/');
-    }
-  };
-
   const handleSignOut = async () => {
     if (confirm('Sign out of your account?')) {
       await signOut();
@@ -176,15 +169,12 @@ function CoachingPageContent() {
       )}
     </div>
           <div className="flex items-center gap-2">
-            <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="hidden sm:block bg-slate-700 text-white rounded px-2 py-1.5 text-sm">
-              {Object.entries(SCENARIOS).map(([value, details]) => <option key={value} value={value}>{details.label}</option>)}
-            </select>
-            <button
-              onClick={handleEndSession}
-              className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
-            >
-              End Session
-            </button>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
+              <span>Pick a scenario for better context</span>
+              <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)} disabled={conversation.length > 0} className="bg-slate-700 text-white rounded px-2 py-1.5 text-sm">
+                {Object.entries(SCENARIOS).map(([value, details]) => <option key={value} value={value}>{details.label}</option>)}
+              </select>
+            </label>
             <button
               onClick={handleSignOut}
               className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
