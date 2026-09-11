@@ -478,7 +478,7 @@ export default function VoiceChat({ onTranscriptUpdate, onTurnComplete, onSessio
                 Tap the button below and speak naturally. The AI will listen,
                 understand, and give you instant feedback.
               </p>
-              <div className="relative mx-auto mt-6 h-56 w-full">
+              <div className="relative mx-auto mt-6 h-112 w-112 max-w-[calc(100vw-2rem)]">
                 <Image
                   src="/curtis-ai-logo.png"
                   alt="Curtis Riggleman AI"
