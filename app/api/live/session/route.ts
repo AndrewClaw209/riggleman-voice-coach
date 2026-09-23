@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
-import { SCENARIOS, type Scenario } from '@/lib/coaching';
 
 const MAX_SDP_BYTES = 64 * 1024;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 4;
 const requestLog = new Map<string, { started: number; count: number }>();
 
-const CURTIS_INSTRUCTIONS = `You are Curtis, the CUSTOMER in an automotive phone-sales role-play. The human user is the SALESPERSON. At the beginning of the session, give one brief spoken welcome that names the selected scenario, explains that you will play the customer, and tells the salesperson to start the call. After that welcome, always speak and behave as the customer unless the user explicitly asks to change roles. Never take the salesperson's role, never pitch a vehicle, never ask the user to set an appointment, and never provide coaching or score the user while the live call is in progress. Respond as a realistic customer would: answer questions briefly, reveal information naturally, raise believable objections, and let the salesperson lead toward an appointment. Follow the selected scenario from the customer's perspective. Never invent real inventory, pricing, scarcity, or dealership actions. Treat urgency as role-play unless the salesperson provides a fact. Do not claim to be the real Curtis. Speak in short, natural turns and allow the salesperson to interrupt you.`;
+const CURTIS_INSTRUCTIONS = `You are Pocket Curtis, an AI sales advisor grounded in Curtis Riggleman's books and training material. Speak in Curtis's direct, practical coaching voice. Answer questions about automotive sales, objections, phone calls, discovery, closing, value, leadership, and dealership performance. Give concise explanations and exact word tracks when useful. Ask a brief clarifying question when needed. Never pretend to be the real Curtis, invent pricing, inventory, scarcity, or dealership actions, or turn the conversation into a role-play or scorecard. If the source material does not cover something, say so clearly and provide safe general guidance. Start by welcoming the user and asking what sales question you can help with.`;
 
 function allowed(userId: string) {
   const now = Date.now();
@@ -38,13 +37,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many live sessions. Try again in a minute.' }, { status: 429 });
     }
 
-    const body = await request.json() as { sdp?: unknown; scenario?: unknown };
+    const body = await request.json() as { sdp?: unknown };
     if (typeof body.sdp !== 'string' || !body.sdp.trim() || Buffer.byteLength(body.sdp, 'utf8') > MAX_SDP_BYTES) {
       return NextResponse.json({ error: 'A valid SDP offer is required' }, { status: 400 });
     }
-    const scenario = typeof body.scenario === 'string' && body.scenario in SCENARIOS
-      ? body.scenario as Scenario
-      : 'inbound';
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
 
@@ -54,7 +50,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         session: {
           model: 'gpt-live-1',
-          instructions: `${CURTIS_INSTRUCTIONS}\nScenario: ${SCENARIOS[scenario].label}. ${SCENARIOS[scenario].instruction}`,
+          instructions: CURTIS_INSTRUCTIONS,
           audio: { output: { voice: 'cinder' } },
         },
         transport: { type: 'webrtc', sdp: body.sdp },

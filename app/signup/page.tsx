@@ -60,7 +60,7 @@ export default function SignupPage() {
           </p>
           <h1 className="text-4xl font-bold mb-3">Build confidence on every call</h1>
           <p className="text-slate-400 leading-relaxed">
-            Create your free coaching account to practice realistic customer conversations,
+            Create your free account to talk with Pocket Curtis about sales,
             sharpen your sales process, and get instant feedback after every session.
           </p>
         </div>

@@ -14,9 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Riggleman Sales Coach',
-  description:
-    'AI-powered voice coaching for Hyundai and Kia sales professionals',
+  title: 'Pocket Curtis',
+  description: 'Your on-demand AI sales advisor in Curtis Riggleman\'s voice',
   icons: {
     icon: '/favicon.ico',
   },
