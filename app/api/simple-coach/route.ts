@@ -38,6 +38,33 @@ function validConversation(value: unknown): ConversationMessage[] {
   });
 }
 
+async function synthesizeSpeech(input: string, openaiKey: string) {
+  const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+
+  if (elevenLabsKey && voiceId) {
+    return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': elevenLabsKey,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text: input,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true },
+      }),
+    });
+  }
+
+  return fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'tts-1', voice: 'onyx', input, response_format: 'mp3' }),
+  });
+}
+
 export async function POST(request: NextRequest) {
   let stage = 'request validation';
   try {
@@ -72,7 +99,7 @@ export async function POST(request: NextRequest) {
     const completion = await openai.chat.completions.create({ model: 'gpt-4o', messages, temperature: 0.7, max_tokens: 600 });
     const coachResponse = completion.choices[0]?.message.content?.trim() || 'Tell me more.';
     stage = 'voice response';
-    const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'tts-1', voice: 'onyx', input: coachResponse, response_format: 'mp3' }) });
+    const ttsResponse = await synthesizeSpeech(coachResponse, apiKey);
     if (!ttsResponse.ok) {
       console.error('TTS request failed:', ttsResponse.status, await ttsResponse.text());
       return NextResponse.json({ error: 'Voice response failed', stage }, { status: 502 });
