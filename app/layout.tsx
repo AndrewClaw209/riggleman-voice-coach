@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Pocket Curtis',
+  title: 'Curtis AI',
   description: 'Your on-demand AI sales advisor in Curtis Riggleman\'s voice',
   icons: {
     icon: '/favicon.ico',

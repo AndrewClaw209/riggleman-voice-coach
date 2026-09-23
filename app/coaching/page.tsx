@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 
 type ConversationMessage = { role: 'user' | 'assistant'; content: string };
 
-function PocketCurtisContent() {
+function CurtisAIContent() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const { userProfile, signOut } = useAuth();
   const router = useRouter();
@@ -24,7 +24,7 @@ function PocketCurtisContent() {
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f2cd7f] to-[#c58b2a] text-xl shadow-[0_4px_18px_rgba(226,167,63,0.2)]">C</div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold sm:text-lg">Pocket Curtis</h1>
+            <h1 className="truncate text-base font-bold sm:text-lg">Curtis AI</h1>
             <p className="truncate text-xs text-slate-400">Your on-demand sales advisor</p>
           </div>
         </div>
@@ -44,5 +44,5 @@ function PocketCurtisContent() {
 }
 
 export default function CoachingPage() {
-  return <ProtectedRoute><PocketCurtisContent /></ProtectedRoute>;
+  return <ProtectedRoute><CurtisAIContent /></ProtectedRoute>;
 }

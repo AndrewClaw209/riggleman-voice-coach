@@ -138,7 +138,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       channel.addEventListener('message', handleLiveEvent);
       channel.addEventListener('open', () => {
         setStage('live');
-        channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['audio', 'text'], instructions: 'Welcome the user to Pocket Curtis in one short sentence, then ask what sales question you can help with.' } }));
+        channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['audio', 'text'], instructions: 'Welcome the user to Curtis AI in one short sentence, then ask what sales question you can help with.' } }));
       });
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
@@ -175,7 +175,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className={`mx-auto flex w-full max-w-2xl flex-col px-4 ${conversation.length ? 'py-5' : 'py-10'}`}>
         {!conversation.length && stage === 'idle' ? <div className="mb-8 text-center">
-          <div className="relative mx-auto mb-6 h-48 w-48 sm:h-60 sm:w-60"><Image src="/curtis-ai-logo.png" alt="Pocket Curtis" fill sizes="240px" className="object-contain" priority /></div>
+          <div className="relative mx-auto mb-6 h-48 w-48 sm:h-60 sm:w-60"><Image src="/curtis-ai-logo.png" alt="Curtis AI" fill sizes="240px" className="object-contain" priority /></div>
           <h2 className="text-2xl font-bold text-white sm:text-3xl">Ask Curtis anything.</h2>
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-400">Get practical answers on sales, objections, calls, closing, leadership, and the principles from Curtis’s books.</p>
         </div> : null}

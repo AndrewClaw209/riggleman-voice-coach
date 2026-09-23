@@ -58,7 +58,7 @@ export default function LoginPage() {
             className="mx-auto mb-2 mt-0 h-auto w-full max-w-[28rem] object-contain"
           />
           <h1 className="text-4xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-slate-400">Sign in to talk with Pocket Curtis</p>
+          <p className="text-slate-400">Sign in to talk with Curtis AI</p>
         </div>
 
         <div className="bg-slate-800 p-8 rounded-lg border border-slate-700">
