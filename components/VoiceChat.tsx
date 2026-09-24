@@ -111,9 +111,9 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       const response = await fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query: question }) });
       const result = await response.json() as KnowledgeResult;
       const context = response.ok && result.context ? result.context : 'No directly relevant excerpt was found. Use Curtis’s core sales principles and be transparent if the books do not cover the question.';
-      channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: `Answer the user's latest question using the Curtis source excerpts below. Stay conversational and concise for spoken delivery. Do not mention retrieval, excerpts, or source labels unless asked. Do not invent details that are not supported by the material.\n\nCURTIS SOURCE MATERIAL:\n${context}` } }));
+      channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], max_output_tokens: 220, instructions: `Answer the user's latest question using the Curtis source excerpts below. Give a focused spoken answer in 2-4 short sentences, usually under 70 words. Lead with the practical answer, then give one exact word track or next step when useful. Use natural conversational phrasing and punctuation so the voice can breathe. Do not mention retrieval, excerpts, or source labels unless asked. Do not invent details that are not supported by the material.\n\nCURTIS SOURCE MATERIAL:\n${context}` } }));
     } catch {
-      channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Answer the user’s latest question as Curtis AI: direct, practical, concise, and grounded in his known sales coaching principles.' } }));
+      channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], max_output_tokens: 220, instructions: 'Answer the user’s latest question as Curtis AI: direct, practical, and conversational. Give 2-4 short sentences, usually under 70 words. Use natural punctuation and pauses. Ground the answer in known sales coaching principles and do not invent specifics.' } }));
     } finally {
       liveResponsePendingRef.current = false;
     }
@@ -148,8 +148,8 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       channel.addEventListener('message', handleLiveEvent);
       channel.addEventListener('open', () => {
         setStage('live');
-        channel.send(JSON.stringify({ type: 'session.update', session: { modalities: ['text'], instructions: 'You are Curtis AI, a direct and practical sales advisor. Speak conversationally and concisely. The client will provide relevant excerpts from Curtis Riggleman’s books before each response. Do not pretend to be the real Curtis or invent unsupported facts.', input_audio_transcription: { model: 'gpt-4o-transcribe' }, turn_detection: { type: 'server_vad', create_response: false, interrupt_response: true } } }));
-        channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Welcome the user in one short sentence, then ask what sales question you can help with.' } }));
+        channel.send(JSON.stringify({ type: 'session.update', session: { modalities: ['text'], instructions: 'You are Curtis AI, a direct and practical sales advisor. Keep spoken answers focused: 2-4 short sentences, usually under 70 words. Use natural punctuation and pauses so the answer sounds deliberate, never rushed. The client will provide relevant excerpts from Curtis Riggleman’s books before each response. Do not pretend to be the real Curtis or invent unsupported facts.', input_audio_transcription: { model: 'gpt-4o-transcribe' }, turn_detection: { type: 'server_vad', create_response: false, interrupt_response: true } } }));
+        channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], max_output_tokens: 80, instructions: 'Welcome the user in one relaxed sentence, then ask what sales question you can help with.' } }));
       });
       channel.addEventListener('error', () => setError('Live voice connection failed. Try again.'));
       const offer = await peer.createOffer();

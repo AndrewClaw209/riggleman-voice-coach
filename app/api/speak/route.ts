@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
   const openaiKey = process.env.OPENAI_API_KEY;
   let response: Response;
   if (elevenLabsKey && voiceId) {
-    response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?optimize_streaming_latency=4`, {
       method: 'POST',
       headers: { 'xi-api-key': elevenLabsKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
-      body: JSON.stringify({ text: body.text.trim(), model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.38, similarity_boost: 0.95, style: 0.2, use_speaker_boost: true } }),
+      body: JSON.stringify({ text: body.text.trim(), model_id: 'eleven_flash_v2_5', voice_settings: { stability: 0.48, similarity_boost: 0.95, style: 0.15, speed: 0.88, use_speaker_boost: true } }),
     });
   } else if (openaiKey) {
     response = await fetch('https://api.openai.com/v1/audio/speech', {
