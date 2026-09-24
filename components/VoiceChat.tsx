@@ -10,7 +10,7 @@ interface VoiceChatProps {
   onTranscriptUpdate: (message: ConversationMessage) => void;
 }
 
-const AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'agent_3901m38dqc35exzr69sjdmsgk9';
+const AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'agent_3901m38dqc35exzr69sjdmsgk9m8';
 
 type AgentMessage = {
   source?: 'user' | 'ai';
