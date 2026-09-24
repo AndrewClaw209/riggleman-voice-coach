@@ -67,7 +67,10 @@ function AgentVoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       seenMessagesRef.current.clear();
       await startSession({
         agentId: AGENT_ID,
-        connectionType: 'webrtc',
+        // WebSocket keeps the same hands-free streaming conversation, but is
+        // more reliable for browsers/networks that drop the LiveKit WebRTC
+        // signal channel immediately after publishing the microphone.
+        connectionType: 'websocket',
         userId: undefined,
       });
     } catch (cause) {
