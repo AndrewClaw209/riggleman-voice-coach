@@ -5,6 +5,7 @@ import VoiceChat from '@/components/VoiceChat';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 type ConversationMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -22,11 +23,7 @@ function CurtisAIContent() {
     <main className="flex h-[100dvh] flex-col bg-slate-950 text-white">
       <header className="flex shrink-0 items-center justify-between border-b border-slate-800/80 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f2cd7f] to-[#c58b2a] text-xl shadow-[0_4px_18px_rgba(226,167,63,0.2)]">C</div>
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-bold sm:text-lg">Curtis AI</h1>
-            <p className="truncate text-xs text-slate-400">Your on-demand sales advisor</p>
-          </div>
+          <Image src="/curtis-ai-logo.png" alt="Curtis AI" width={178} height={53} className="h-auto w-[140px] sm:w-[178px]" priority />
         </div>
         <div className="flex items-center gap-3">
           <span className="hidden text-xs text-slate-500 sm:block">{userProfile?.displayName || 'Sales professional'}</span>

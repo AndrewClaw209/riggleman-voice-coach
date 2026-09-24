@@ -112,7 +112,7 @@ function AgentVoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       </div>
     </div>
     <div className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-      <button onClick={busy ? stop : start} disabled={connecting} className={`w-full rounded-xl px-6 py-4 text-lg font-bold shadow-lg transition-all disabled:opacity-50 ${connected ? 'bg-red-700 text-white hover:bg-red-600' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-emerald-500 hover:to-emerald-600'}`}>{connected ? 'End conversation' : connecting ? 'Connecting…' : 'Talk to Curtis'}</button>
+      <button onClick={busy ? stop : start} disabled={connecting} className={`w-full rounded-xl px-6 py-4 text-lg font-bold shadow-[0_8px_24px_rgba(226,167,63,0.24)] transition-all disabled:cursor-wait disabled:opacity-50 ${connected ? 'bg-red-700 text-white hover:bg-red-600' : 'bg-[#e2a73f] text-[#17120a] hover:bg-[#f2cd7f] hover:shadow-[0_8px_28px_rgba(242,205,127,0.35)]'}`}>{connected ? 'End conversation' : connecting ? 'Connecting…' : 'Talk to Curtis'}</button>
       <p className="mt-2 text-center text-xs text-slate-500">Hands-free voice conversation with Curtis AI.</p>
     </div>
   </div>;
