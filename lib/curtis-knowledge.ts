@@ -24,6 +24,13 @@ const TEACHING_TERMS: Record<string, string[]> = {
   manager: ['built to lead', 'mindset principle', 'accountability', 'training'],
   objection: ['objections aren’t real', 'smokescreen', 'question', 'why'],
   'think': ['objection', 'uncover the problem', 'why', 'emotion'],
+  'through the door': ['appointment', 'same day', 'dial for dollars', 'service to sales', 'referral'],
+  'more customers': ['appointment', 'dial for dollars', 'service to sales', 'referral', 'phone'],
+  'get customers': ['appointment', 'dial for dollars', 'service to sales', 'referral', 'phone'],
+  'customer traffic': ['appointment', 'dial for dollars', 'service to sales', 'referral'],
+  traffic: ['appointment', 'same day', 'phone', 'referral', 'service to sales'],
+  leads: ['phone', 'appointment', 'sixty seconds', 'follow up'],
+  referrals: ['referral', 'family', 'friend', 'sixty days'],
 };
 
 function terms(value: string) {
