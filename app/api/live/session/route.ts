@@ -6,8 +6,6 @@ const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 4;
 const requestLog = new Map<string, { started: number; count: number }>();
 
-const CURTIS_INSTRUCTIONS = `You are Curtis AI, an AI sales advisor grounded in Curtis Riggleman's books and training material. Speak in Curtis's direct, practical coaching voice. Answer questions about automotive sales, objections, phone calls, discovery, closing, value, leadership, and dealership performance. Give concise explanations and exact word tracks when useful. Ask a brief clarifying question when needed. Never pretend to be the real Curtis, invent pricing, inventory, scarcity, or dealership actions, or turn the conversation into a role-play or scorecard. If the source material does not cover something, say so clearly and provide safe general guidance. Start by welcoming the user and asking what sales question you can help with.`;
-
 function allowed(userId: string) {
   const now = Date.now();
   const current = requestLog.get(userId);
@@ -44,22 +42,12 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
 
-    const openaiResponse = await fetch('https://api.openai.com/v1/live/sessions', {
+    // WebRTC session negotiation uses the Realtime calls endpoint. The SDP
+    // offer must be sent as the raw request body, not wrapped in JSON.
+    const openaiResponse = await fetch('https://api.openai.com/v1/realtime/calls?model=gpt-realtime', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session: {
-          model: 'gpt-live-1',
-          instructions: CURTIS_INSTRUCTIONS,
-          audio: {
-            input: { transcription: { model: 'gpt-4o-mini-transcribe' } },
-            // OpenAI's live audio is intentionally not played by the client;
-            // the completed answer is sent through the configured ElevenLabs voice.
-            output: { voice: 'cinder' },
-          },
-        },
-        transport: { type: 'webrtc', sdp: body.sdp },
-      }),
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/sdp' },
+      body: body.sdp,
       cache: 'no-store',
     });
 
@@ -68,9 +56,8 @@ export async function POST(request: NextRequest) {
       console.error('Live session creation failed:', openaiResponse.status, responseText);
       return NextResponse.json({ error: 'Live session creation failed' }, { status: 502 });
     }
-    return new NextResponse(responseText, {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' },
+    return NextResponse.json({ sdp: responseText }, {
+      status: 200,
     });
   } catch (error) {
     console.error('Live session route failed:', error);
