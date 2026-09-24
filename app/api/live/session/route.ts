@@ -51,7 +51,12 @@ export async function POST(request: NextRequest) {
         session: {
           model: 'gpt-live-1',
           instructions: CURTIS_INSTRUCTIONS,
-          audio: { output: { voice: 'cinder' } },
+          audio: {
+            input: { transcription: { model: 'gpt-4o-mini-transcribe' } },
+            // OpenAI's live audio is intentionally not played by the client;
+            // the completed answer is sent through the configured ElevenLabs voice.
+            output: { voice: 'cinder' },
+          },
         },
         transport: { type: 'webrtc', sdp: body.sdp },
       }),

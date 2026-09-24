@@ -19,8 +19,14 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const livePeerRef = useRef<RTCPeerConnection | null>(null);
+  const liveChannelRef = useRef<RTCDataChannel | null>(null);
+  const liveStreamRef = useRef<MediaStream | null>(null);
+  const livePartialRef = useRef({ user: '', assistant: '' });
+  const liveMessagesRef = useRef<ConversationMessage[]>([]);
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const liveEnabled = process.env.NEXT_PUBLIC_ENABLE_LIVE_COACHING === 'true';
 
   const addMessage = (message: ConversationMessage) => {
     setConversation((current) => [...current, message]);
@@ -66,6 +72,86 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
     }
   };
 
+  const handleLiveEvent = (event: MessageEvent) => {
+    try {
+      const payload = JSON.parse(event.data as string) as { type?: string; delta?: string; transcript?: string; text?: string };
+      const type = payload.type || '';
+      const userDelta = type.includes('input_audio_transcription.delta') || type === 'session.input_transcript.delta';
+      const userFinal = type.includes('input_audio_transcription.completed') || type === 'session.input_transcript.done' || type === 'session.input_transcript.completed';
+      const assistantDelta = type === 'response.text.delta' || type === 'response.audio_transcript.delta' || type === 'response.output_audio_transcript.delta' || type === 'session.output_transcript.delta';
+      const assistantFinal = type === 'response.text.done' || type === 'response.output_text.done' || type === 'response.audio_transcript.done' || type === 'response.output_audio_transcript.done' || type === 'session.output_transcript.done' || type === 'session.output_transcript.completed';
+      if (!userDelta && !userFinal && !assistantDelta && !assistantFinal) return;
+      const role = userDelta || userFinal ? 'user' : 'assistant';
+      if (userDelta || assistantDelta) {
+        livePartialRef.current[role] += payload.delta || '';
+        return;
+      }
+      const text = (payload.transcript || payload.text || livePartialRef.current[role]).trim();
+      livePartialRef.current[role] = '';
+      if (!text) return;
+      const previous = liveMessagesRef.current.at(-1);
+      if (previous?.role === role && previous.content === text) return;
+      const message = { role, content: text } as ConversationMessage;
+      liveMessagesRef.current.push(message);
+      addMessage(message);
+      if (role === 'assistant') void speakLiveResponse(text);
+    } catch { /* Ignore non-JSON WebRTC events. */ }
+  };
+
+  const speakLiveResponse = async (text: string) => {
+    try {
+      setStage('speaking');
+      const token = await user?.getIdToken();
+      if (!token) return;
+      const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ text }) });
+      const result = await response.json() as { audio?: string };
+      if (response.ok && result.audio) await playAudio(result.audio);
+      if (livePeerRef.current) setStage('live');
+    } catch { if (livePeerRef.current) setStage('live'); }
+  };
+
+  const startLive = async () => {
+    let stream: MediaStream | null = null;
+    try {
+      setError(null); setStage('connecting'); liveMessagesRef.current = []; livePartialRef.current = { user: '', assistant: '' };
+      const token = await user?.getIdToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      liveStreamRef.current = stream;
+      const peer = new RTCPeerConnection();
+      livePeerRef.current = peer;
+      // Do not attach OpenAI's stock audio track. Responses are synthesized by ElevenLabs below.
+      stream.getTracks().forEach((track) => peer.addTrack(track, stream as MediaStream));
+      const channel = peer.createDataChannel('oai-events');
+      liveChannelRef.current = channel;
+      channel.addEventListener('message', handleLiveEvent);
+      channel.addEventListener('open', () => {
+        setStage('live');
+        channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Welcome the user in one short sentence, then ask what sales question you can help with.' } }));
+      });
+      channel.addEventListener('error', () => setError('Live voice connection failed. Try again.'));
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      const response = await fetch('/api/live/session', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ sdp: offer.sdp }) });
+      const result = await response.json() as { error?: string; transport?: { sdp?: string }; sdp?: string };
+      if (!response.ok) throw new Error(result.error || 'Could not start live voice');
+      const answer = result.transport?.sdp || result.sdp;
+      if (!answer) throw new Error('Live session returned no SDP answer');
+      await peer.setRemoteDescription({ type: 'answer', sdp: answer });
+      setStage('live');
+    } catch (cause) {
+      stream?.getTracks().forEach((track) => track.stop());
+      livePeerRef.current?.close(); livePeerRef.current = null; liveChannelRef.current = null;
+      setStage('error'); setError(cause instanceof Error ? cause.message : 'Could not start live voice');
+    }
+  };
+
+  const stopLive = () => {
+    liveChannelRef.current?.close(); livePeerRef.current?.close(); liveStreamRef.current?.getTracks().forEach((track) => track.stop());
+    liveChannelRef.current = null; livePeerRef.current = null; liveStreamRef.current = null;
+    setStage('idle');
+  };
+
   const processAudio = async (blob: Blob) => {
     try {
       setStage('thinking');
@@ -95,6 +181,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   };
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [conversation.length, stage]);
+  useEffect(() => () => stopLive(), []);
 
   const busy = stage !== 'idle' && stage !== 'error';
   const status: Record<ProcessingStage, string> = { idle: '', connecting: 'Connecting to Curtis…', live: 'Curtis is listening', recording: 'Listening…', transcribing: 'Transcribing…', thinking: 'Curtis is thinking…', speaking: 'Curtis is speaking…', error: 'Something went wrong' };
@@ -117,7 +204,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       </div>
     </div>
     <div className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-      {!mediaRecorderRef.current || stage !== 'recording' ? <button onClick={startRecording} disabled={busy} className="flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-4 text-lg font-bold text-white shadow-lg transition-all hover:from-emerald-500 hover:to-emerald-600 disabled:opacity-50"><span className="text-2xl">🎙️</span>{conversation.length ? 'Ask another question' : 'Talk to Curtis'}</button> : <button onClick={stopRecording} className="flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 text-lg font-bold text-white shadow-lg"><span className="text-2xl">⏹️</span>Done speaking</button>}
+      {liveEnabled ? <button onClick={stage === 'live' || stage === 'speaking' ? stopLive : startLive} disabled={busy && stage !== 'live' && stage !== 'speaking'} className={`w-full rounded-xl px-6 py-4 text-lg font-bold shadow-lg transition-all disabled:opacity-50 ${stage === 'live' || stage === 'speaking' ? 'bg-red-700 text-white hover:bg-red-600' : 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-emerald-500 hover:to-emerald-600'}`}>{stage === 'live' || stage === 'speaking' ? 'End conversation' : 'Talk to Curtis'}</button> : !mediaRecorderRef.current || stage !== 'recording' ? <button onClick={startRecording} disabled={busy} className="flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-4 text-lg font-bold text-white shadow-lg transition-all hover:from-emerald-500 hover:to-emerald-600 disabled:opacity-50"><span className="text-2xl">🎙️</span>{conversation.length ? 'Ask another question' : 'Talk to Curtis'}</button> : <button onClick={stopRecording} className="flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 text-lg font-bold text-white shadow-lg"><span className="text-2xl">⏹️</span>Done speaking</button>}
       <p className="mt-2 text-center text-xs text-slate-500">Voice answers grounded in Curtis’s sales and leadership material.</p>
     </div>
   </div>;
