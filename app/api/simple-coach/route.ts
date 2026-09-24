@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getAdminAuth } from '@/lib/firebase-admin';
+import { formatKnowledgeContext, searchCurtisBooks } from '@/lib/curtis-knowledge';
 
 const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const MAX_MESSAGES = 20;
@@ -91,9 +92,11 @@ export async function POST(request: NextRequest) {
     const transcription = await openai.audio.transcriptions.create({ file: new File([audioBuffer], `audio.${extension}`, { type: audioType }), model: 'whisper-1' });
     const userText = transcription.text.trim().slice(0, MAX_MESSAGE_CHARS);
     if (!userText) return NextResponse.json({ error: 'No speech detected' }, { status: 422 });
+    const sourceContext = formatKnowledgeContext(searchCurtisBooks(userText));
 
     const messages = [
       { role: 'system' as const, content: SYSTEM_PROMPT },
+      { role: 'system' as const, content: `Use the following relevant excerpts from Curtis's books as your source material. Do not mention retrieval or source labels unless asked, and do not invent details unsupported by the excerpts.\n\n${sourceContext}` },
       ...conversation,
       { role: 'user' as const, content: userText },
     ];

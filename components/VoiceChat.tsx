@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
 
 type ConversationMessage = { role: 'user' | 'assistant'; content: string };
+type KnowledgeResult = { context?: string };
 type ProcessingStage = 'idle' | 'connecting' | 'live' | 'recording' | 'transcribing' | 'thinking' | 'speaking' | 'error';
 
 interface VoiceChatProps {
@@ -24,6 +25,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   const liveStreamRef = useRef<MediaStream | null>(null);
   const livePartialRef = useRef({ user: '', assistant: '' });
   const liveMessagesRef = useRef<ConversationMessage[]>([]);
+  const liveResponsePendingRef = useRef(false);
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const liveEnabled = process.env.NEXT_PUBLIC_ENABLE_LIVE_COACHING === 'true';
@@ -94,8 +96,27 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       const message = { role, content: text } as ConversationMessage;
       liveMessagesRef.current.push(message);
       addMessage(message);
+      if (role === 'user') void requestLiveResponse(text);
       if (role === 'assistant') void speakLiveResponse(text);
     } catch { /* Ignore non-JSON WebRTC events. */ }
+  };
+
+  const requestLiveResponse = async (question: string) => {
+    const channel = liveChannelRef.current;
+    if (!channel || channel.readyState !== 'open' || liveResponsePendingRef.current) return;
+    liveResponsePendingRef.current = true;
+    try {
+      const token = await user?.getIdToken();
+      if (!token) return;
+      const response = await fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query: question }) });
+      const result = await response.json() as KnowledgeResult;
+      const context = response.ok && result.context ? result.context : 'No directly relevant excerpt was found. Use Curtis’s core sales principles and be transparent if the books do not cover the question.';
+      channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: `Answer the user's latest question using the Curtis source excerpts below. Stay conversational and concise for spoken delivery. Do not mention retrieval, excerpts, or source labels unless asked. Do not invent details that are not supported by the material.\n\nCURTIS SOURCE MATERIAL:\n${context}` } }));
+    } catch {
+      channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Answer the user’s latest question as Curtis AI: direct, practical, concise, and grounded in his known sales coaching principles.' } }));
+    } finally {
+      liveResponsePendingRef.current = false;
+    }
   };
 
   const speakLiveResponse = async (text: string) => {
@@ -127,6 +148,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
       channel.addEventListener('message', handleLiveEvent);
       channel.addEventListener('open', () => {
         setStage('live');
+        channel.send(JSON.stringify({ type: 'session.update', session: { modalities: ['text'], instructions: 'You are Curtis AI, a direct and practical sales advisor. Speak conversationally and concisely. The client will provide relevant excerpts from Curtis Riggleman’s books before each response. Do not pretend to be the real Curtis or invent unsupported facts.', input_audio_transcription: { model: 'gpt-4o-transcribe' }, turn_detection: { type: 'server_vad', create_response: false, interrupt_response: true } } }));
         channel.send(JSON.stringify({ type: 'response.create', response: { modalities: ['text'], instructions: 'Welcome the user in one short sentence, then ask what sales question you can help with.' } }));
       });
       channel.addEventListener('error', () => setError('Live voice connection failed. Try again.'));
@@ -148,7 +170,7 @@ export default function VoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
 
   const stopLive = () => {
     liveChannelRef.current?.close(); livePeerRef.current?.close(); liveStreamRef.current?.getTracks().forEach((track) => track.stop());
-    liveChannelRef.current = null; livePeerRef.current = null; liveStreamRef.current = null;
+    liveChannelRef.current = null; livePeerRef.current = null; liveStreamRef.current = null; liveResponsePendingRef.current = false;
     setStage('idle');
   };
 
