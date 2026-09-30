@@ -30,19 +30,29 @@ body {
 .app-root { min-height: 100dvh; }
 .awevo-footer {
   display: flex;
+  width: 100%;
+  min-height: 2.8rem;
   justify-content: center;
+  align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
   border-top: 1px solid rgb(242 205 127 / 16%);
   background: rgb(10 13 18 / 96%);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
   color: #77756e;
   font-size: .7rem;
   letter-spacing: .02em;
   line-height: 1.25;
-  padding: .65rem 1rem;
+  padding: .7rem 1rem;
   text-align: center;
 }
+.awevo-footer span { display: inline-flex; align-items: center; justify-content: center; }
+.awevo-footer span + span::before { content: '•'; color: var(--curtis-gold-strong); margin-right: 1rem; }
 .awevo-footer strong { color: #c7b890; font-weight: 700; }
+@media (max-width: 520px) {
+  .awevo-footer { flex-direction: column; gap: .2rem; }
+  .awevo-footer span + span::before { display: none; }
+}
 
 /* Curtis Riggleman brand layer. These aliases keep the existing component
    structure intact while giving every route the shared black-and-gold system. */
