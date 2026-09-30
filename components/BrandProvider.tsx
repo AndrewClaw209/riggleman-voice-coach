@@ -23,10 +23,12 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
     return <Image src="/curtis-ai-logo.png" alt={brand.logoAlt} width={178} height={53} className={compact ? 'h-auto w-[140px]' : 'h-auto w-[178px]'} priority />;
   }
 
-  return (
-    <div className={`enterprise-mark${compact ? ' enterprise-mark-compact' : ''}`} aria-label={brand.logoAlt}>
-      <span className="enterprise-mark-primary">R U READY</span>
-      <span className="enterprise-mark-secondary">SALES COACHING AI</span>
-    </div>
-  );
+  return <Image
+    src="/r-u-ready-ai-logo.png"
+    alt={brand.logoAlt}
+    width={724}
+    height={233}
+    className={`enterprise-logo${compact ? ' enterprise-logo-compact' : ''}`}
+    priority
+  />;
 }

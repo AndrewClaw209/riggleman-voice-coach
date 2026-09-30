@@ -76,21 +76,10 @@ a:focus-visible { outline-color: var(--curtis-gold) !important; }
 
 ::selection { background: var(--curtis-gold-strong); color: #17120a; }
 
-.enterprise-mark {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  color: #f7f2e5;
-  line-height: .95;
-  white-space: nowrap;
-}
-.enterprise-mark-primary { font-size: 1.28rem; font-weight: 900; letter-spacing: .08em; }
-.enterprise-mark-secondary { color: #f2cd7f; font-size: .58rem; font-weight: 800; letter-spacing: .22em; }
-.enterprise-mark-compact .enterprise-mark-primary { font-size: .95rem; }
-.enterprise-mark-compact .enterprise-mark-secondary { font-size: .43rem; }
+.enterprise-logo { display: block; width: 250px; height: auto; object-fit: contain; }
+.enterprise-logo-compact { width: 190px; }
 .enterprise-hero-mark { width: 100%; height: 12rem; }
-.enterprise-hero-mark .enterprise-mark { transform: scale(1.35); }
+.enterprise-hero-mark .enterprise-logo { width: min(360px, 100%); }
 
 [data-brand="enterprise"] {
   --curtis-gold: #f4b942;
