@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth } from '../../lib/AuthContext';
+import { BrandMark, useBrand } from '../../components/BrandProvider';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -15,6 +15,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { signUp } = useAuth();
+  const brand = useBrand();
 
   useEffect(() => {
     window.localStorage.setItem('curtis-auth-visited', 'true');
@@ -48,19 +49,13 @@ export default function SignupPage() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
       <div className="max-w-md w-full mx-auto px-6">
         <div className="text-center mb-8">
-          <Image
-            src="/curtis-ai-logo.png"
-            alt="Curtis Riggleman AI"
-            width={892}
-            height={266}
-            className="mx-auto my-0 h-auto w-full max-w-[28rem] object-contain py-2"
-          />
+          <div className="mb-4 flex justify-center"><BrandMark /></div>
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-400 mb-3">
-            Welcome to Curtis AI
+            Welcome to {brand.name}
           </p>
           <h1 className="text-4xl font-bold mb-3">Build confidence on every call</h1>
           <p className="text-slate-400 leading-relaxed">
-            Create your free account to talk with Curtis AI about sales,
+            Create your account to talk with {brand.name} about sales,
             sharpen your sales process, and get instant feedback after every session.
           </p>
         </div>

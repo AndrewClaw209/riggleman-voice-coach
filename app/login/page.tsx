@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth } from '../../lib/AuthContext';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
+import { BrandMark, useBrand } from '../../components/BrandProvider';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { signIn } = useAuth();
+  const brand = useBrand();
 
   useEffect(() => {
     const hasVisitedAuth = window.localStorage.getItem('curtis-auth-visited');
@@ -50,15 +51,9 @@ export default function LoginPage() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
       <div className="max-w-md w-full mx-auto px-6">
         <div className="text-center mb-8">
-          <Image
-            src="/curtis-ai-logo.png"
-            alt="Curtis Riggleman AI"
-            width={892}
-            height={266}
-            className="mx-auto mb-2 mt-0 h-auto w-full max-w-[28rem] object-contain"
-          />
+          <div className="mb-4 flex justify-center"><BrandMark /></div>
           <h1 className="text-4xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-slate-400">Sign in to talk with Curtis AI</p>
+          <p className="text-slate-400">Sign in to talk with {brand.name}</p>
         </div>
 
         <div className="bg-slate-800 p-8 rounded-lg border border-slate-700">

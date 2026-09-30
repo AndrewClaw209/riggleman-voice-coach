@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { headers } from 'next/headers';
 import './globals.css';
 import ClientLayout from '../components/ClientLayout';
+import { getBrandForHost } from '../lib/brand';
 
 const geist = Geist({
   variable: '--font-geist-sans',
@@ -13,25 +15,32 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
-  title: 'Curtis AI',
-  description: 'Your on-demand AI sales advisor in Curtis Riggleman\'s voice',
-  icons: {
-    icon: '/favicon.ico',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get('host') || '';
+  const brand = getBrandForHost(host);
+  return {
+    title: brand.name,
+    description: brand.description,
+    icons: { icon: '/favicon.ico' },
+  };
+}
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const hostPromise = headers();
+  return <RootLayoutWithBrand hostPromise={hostPromise}>{children}</RootLayoutWithBrand>;
+}
+
+async function RootLayoutWithBrand({ hostPromise, children }: { hostPromise: ReturnType<typeof headers>; children: React.ReactNode }) {
+  const host = (await hostPromise).get('host') || '';
+  const brand = getBrandForHost(host);
   return (
     <html lang="en">
-      <body
-        className={`${geist.variable} ${geistMono.variable} antialiased`}
-      >
-        <ClientLayout>{children}</ClientLayout>
+      <body data-brand={brand.key} className={`${geist.variable} ${geistMono.variable} antialiased`}>
+        <ClientLayout brand={brand}>{children}</ClientLayout>
       </body>
     </html>
   );

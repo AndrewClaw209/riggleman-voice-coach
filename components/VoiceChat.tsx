@@ -1,8 +1,8 @@
 'use client';
 
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
-import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BrandMark, useBrand } from './BrandProvider';
 
 type ConversationMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -21,6 +21,7 @@ type AgentMessage = {
 };
 
 function AgentVoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
+  const brand = useBrand();
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -56,7 +57,7 @@ function AgentVoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   } = useConversation({
     onMessage: handleMessage,
     onError: (message) => {
-      setError(typeof message === 'string' ? message : 'The Curtis connection encountered an error.');
+      setError(typeof message === 'string' ? message : `The ${brand.shortName} connection encountered an error.`);
     },
     onDisconnect: () => undefined,
   });
@@ -74,7 +75,7 @@ function AgentVoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
         userId: undefined,
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not connect to Curtis.');
+      setError(cause instanceof Error ? cause.message : `Could not connect to ${brand.shortName}.`);
     }
   };
 
@@ -90,30 +91,30 @@ function AgentVoiceChat({ onTranscriptUpdate }: VoiceChatProps) {
   const connecting = status === 'connecting';
   const busy = connected || connecting;
   const statusText = status === 'connecting'
-    ? 'Connecting to Curtis…'
+    ? `Connecting to ${brand.shortName}…`
     : connected
-        ? mode === 'speaking' ? 'Curtis is speaking' : 'Curtis is listening'
+        ? mode === 'speaking' ? `${brand.shortName} is speaking` : `${brand.shortName} is listening`
         : '';
 
   return <div className="flex h-full min-h-0 flex-col">
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className={`mx-auto flex w-full max-w-2xl flex-col px-4 ${conversation.length ? 'py-5' : 'py-10'}`}>
         {!conversation.length && !busy ? <div className="mb-8 text-center">
-          <div className="relative mx-auto mb-6 h-48 w-48 sm:h-60 sm:w-60"><Image src="/curtis-ai-logo.png" alt="Curtis AI" fill sizes="240px" className="object-contain" priority /></div>
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">Talk to Curtis.</h2>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-400">A hands-free conversation with Curtis AI, grounded in his sales training and delivered in his authorized voice.</p>
+          <div className={`relative mx-auto mb-6 flex h-48 w-48 items-center justify-center sm:h-60 sm:w-60 ${brand.key === 'consumer' ? '' : 'enterprise-hero-mark'}`}><BrandMark /></div>
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">Talk to {brand.shortName}.</h2>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-400">A hands-free conversation with {brand.name}, grounded in proven dealership sales coaching.</p>
         </div> : null}
         {statusText ? <div className="mb-5 self-center rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200" aria-live="polite">{statusText}</div> : null}
         {error ? <div className="mb-5 rounded-xl border border-red-900 bg-red-950/60 p-4 text-center text-sm text-red-200"><p>{error}</p><button onClick={() => setError(null)} className="mt-3 font-semibold text-white underline">Dismiss</button></div> : null}
         <div className="space-y-3">
-          {conversation.map((message, index) => <div key={`${message.role}-${index}`} className={`max-w-[88%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'ml-auto bg-emerald-900/60 text-emerald-50' : 'mr-auto border border-slate-700 bg-slate-800/80 text-slate-100'}`}><p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{message.role === 'user' ? 'You' : 'Curtis'}</p><p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p></div>)}
+          {conversation.map((message, index) => <div key={`${message.role}-${index}`} className={`max-w-[88%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'ml-auto bg-emerald-900/60 text-emerald-50' : 'mr-auto border border-slate-700 bg-slate-800/80 text-slate-100'}`}><p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{message.role === 'user' ? 'You' : brand.shortName}</p><p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p></div>)}
         </div>
         <div ref={bottomRef} />
       </div>
     </div>
     <div className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
       <button onClick={busy ? stop : start} disabled={connecting} className={`w-full rounded-xl px-6 py-4 text-lg font-bold shadow-[0_8px_24px_rgba(226,167,63,0.24)] transition-all disabled:cursor-wait disabled:opacity-50 ${connected ? 'bg-red-700 text-white hover:bg-red-600' : 'bg-[#e2a73f] text-[#17120a] hover:bg-[#f2cd7f] hover:shadow-[0_8px_28px_rgba(242,205,127,0.35)]'}`}>{connected ? 'End conversation' : connecting ? 'Connecting…' : 'Talk to Curtis'}</button>
-      <p className="mt-2 text-center text-xs text-slate-500">Hands-free voice conversation with Curtis AI.</p>
+      <p className="mt-2 text-center text-xs text-slate-500">Hands-free voice conversation with {brand.name}.</p>
     </div>
   </div>;
 }
