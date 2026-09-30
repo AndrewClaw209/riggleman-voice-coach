@@ -27,6 +27,23 @@ body {
   font-family: var(--font-geist-sans), Inter, Arial, Helvetica, sans-serif;
 }
 
+.app-root { min-height: 100dvh; }
+.awevo-footer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-top: 1px solid rgb(242 205 127 / 16%);
+  background: rgb(10 13 18 / 96%);
+  color: #77756e;
+  font-size: .7rem;
+  letter-spacing: .02em;
+  line-height: 1.25;
+  padding: .65rem 1rem;
+  text-align: center;
+}
+.awevo-footer strong { color: #c7b890; font-weight: 700; }
+
 /* Curtis Riggleman brand layer. These aliases keep the existing component
    structure intact while giving every route the shared black-and-gold system. */
 .bg-slate-900 { background-color: var(--curtis-bg) !important; }
