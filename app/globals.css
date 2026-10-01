@@ -48,7 +48,8 @@ body {
 }
 .awevo-footer span { display: inline-flex; align-items: center; justify-content: center; }
 .awevo-footer span + span::before { content: '•'; color: var(--curtis-gold-strong); margin-right: 1rem; }
-.awevo-footer strong { color: #c7b890; font-weight: 700; }
+.awevo-footer a { color: #c7b890; font-weight: 700; text-decoration: none; transition: color .2s ease, text-decoration-color .2s ease; }
+.awevo-footer a:hover { color: var(--curtis-gold); text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 520px) {
   .awevo-footer { flex-direction: column; gap: .2rem; }
   .awevo-footer span + span::before { display: none; }
